@@ -4,10 +4,9 @@ set -ex
 #model_path="/path/to/model"
 model_path="/data/yubo/models/Qwen2.5-Math-7B-CFT"
 output_dir="../evaluation_output"
-summary_path="../evaluation_summary/summary.txt"
+summary_path="../evaluation_summary.txt"
 
 export CUDA_VISIBLE_DEVICES=0,1,2,3
-mkdir -p ${output_dir}
 
 cd ../evaluate_math/scripts
 bash evaluate_qwen.sh ${model_path} ${output_dir} ${summary_path}
