@@ -1,5 +1,5 @@
 ### model
-model_name_or_path: /path/to/Qwen2.5-Math-7B
+model_name_or_path: /path/to/Qwen2.5-32B-Instruct
 trust_remote_code: true
 
 ### method
