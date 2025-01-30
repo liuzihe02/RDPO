@@ -40,15 +40,13 @@ cd tools/scripts
 bash download_data.sh
 ```
 
-2. Configure model paths in train/scripts/train_qwen2_5-math-7b-cft/qwen2.5-math-7b-cft-webinstruct-50k.yaml:
+2. Configure model paths in train/scripts/train_qwen2_5-math-7b-cft/qwen2.5-math-7b-cft-webinstruct-50k.yaml
 
 3. Start training:
 ```bash
 cd ../../train/scripts/train_qwen2_5-math-7b-cft
 bash train.sh
 ```
-
-The model was trained for 1 epoch with a learning rate of 5e-6 and a global batch size of 512. Our 7B model training was completed in 1 hours on 8 H100 GPUs using DeepSpeed Zero-3.
 
 For training the 32B model, follow a similar process but refer to the configuration in train/scripts/train_qwen2_5-32b-instruct-cft/qwen2.5-32b-cft-webinstruct-4k.yaml.
 
