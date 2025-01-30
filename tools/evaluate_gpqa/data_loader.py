@@ -229,7 +229,7 @@ def data_reader(dataset: str):
                 answers.append(str(line['answer']))
                 tasks.append(dataset)
     elif 'gpqa' in dataset:
-        with open(f'dataset/gpqa/{dataset}.jsonl', "r", encoding="utf-8") as f:
+        with open(f'dataset/gpqa/gpqa_diamond.jsonl', "r", encoding="utf-8") as f:
             lines = f.readlines()
             for line in lines:
                 data = json.loads(line)
