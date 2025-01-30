@@ -19,10 +19,54 @@ This repo contains the code for [Critique Fine-Tuning: Learning to Critique is M
 
 # Getting Started
 
+## Installation
 
+1. First install LLaMA-Factory:
+```bash
+git clone --depth 1 https://github.com/hiyouga/LLaMA-Factory.git
+cd LLaMA-Factory
+pip install -e ".[torch,metrics]"
+```
 
+2. Install additional requirements:
+pip install -r requirements.txt
 
+## Training Steps
 
+1. First, clone the repository and download the dataset:
+```bash
+git clone https://github.com/TIGER-AI-Lab/CritiqueFineTuning.git
+cd tools/scripts
+bash download_data.sh
+```
 
+2. Configure model paths in train/scripts/train_qwen2_5-math-7b-cft/qwen2.5-math-7b-cft-webinstruct-50k.yaml:
+
+3. Start training:
+```bash
+cd ../../train/scripts/train_qwen2_5-math-7b-cft
+bash train.sh
+```
+
+The model was trained for 1 epoch with a learning rate of 5e-6 and a global batch size of 512. Our 7B model training was completed in 1 hours on 8 H100 GPUs using DeepSpeed Zero-3.
+
+For training the 32B model, follow a similar process but refer to the configuration in train/scripts/train_qwen2_5-32b-instruct-cft/qwen2.5-32b-cft-webinstruct-4k.yaml.
+
+Note: In our paper experiments, we used MATH-500 as the validation set to select the final checkpoint. After training is complete, run the following commands to generate validation scores:
+```bash
+cd train/Validation
+bash start_validate.sh
+```
+This will create a validation_summary.txt file containing MATH-500 scores for each checkpoint. Select the checkpoint with the highest score as your final model.
+
+# Evaluation
+
+Fill in the model path and evaluation result save path in tools/scripts/evaluate.sh, then run:
+```bash
+cd tools/scripts
+bash evaluate.sh
+```
+
+Note: Our evaluation code is modified from [Qwen2.5-Math](https://github.com/QwenLM/Qwen2.5-Math) and [MAmmoTH](https://github.com/TIGER-AI-Lab/MAmmoTH).
 
 
