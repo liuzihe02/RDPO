@@ -1,6 +1,8 @@
 #!/bin/bash
 set -ex
 
+export CUDA_VISIBLE_DEVICES=0,1,2,3
+
 model_dir="/path/to/models"
 summary_path="../../Validation/validation_summary.txt"
 
