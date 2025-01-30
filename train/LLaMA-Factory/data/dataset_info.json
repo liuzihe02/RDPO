@@ -1,9 +1,9 @@
 {
   "WebInstruct-CFT-4K": {
-    "file_name": "WebInstruct-CFT-4K"
+    "file_name": "WebInstruct-CFT-4K.json"
   },
   "WebInstruct-CFT-50K": {
-    "file_name": "WebInstruct-CFT-50K"
+    "file_name": "WebInstruct-CFT-50K.json"
   },
   "identity": {
     "file_name": "identity.json"
