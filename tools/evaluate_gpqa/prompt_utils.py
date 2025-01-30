@@ -632,6 +632,7 @@ def get_examples(tasks: list[str], num_shots: int, pot_flag: str):
     examples['deepmind'] = examples['svamp']
     examples["gpqa_extended"] = examples["gpqa_diamond"]
     examples["gpqa_main"] = examples["gpqa_diamond"]
+    examples["gpqa"] = examples["gpqa_diamond"]
     if 'pot' in pot_flag:
         examples['numglue_pot'] = examples['svamp_pot'][:6] + examples['aqua'][:2]
         examples['simuleq_pot'] = examples['svamp_pot']
