@@ -2,7 +2,7 @@
 set -ex
 
 #model_path="/path/to/model"
-model_path="/data/yubo/models/Qwen2.5-Math-7B"
+model_path="/data/yubo/models/Qwen2.5-Math-7B-CFT"
 output_dir="../evaluation_output"
 summary_path="../evaluation_summary/summary.txt"
 
