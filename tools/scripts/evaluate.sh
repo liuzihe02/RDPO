@@ -3,10 +3,10 @@ set -ex
 
 #model_path="/path/to/model"
 model_path="/data/yubo/models/Qwen2.5-Math-7B-CFT"
-output_dir="../evaluation_output_0130"
-summary_path="../evaluation_summary_0130.txt"
+output_dir="../evaluation_output_0130_new"
+summary_path="../evaluation_summary_0130_new.txt"
 
-export CUDA_VISIBLE_DEVICES=4,5,6,7
+export CUDA_VISIBLE_DEVICES=0,1,2,3
 
 cd ../evaluate_math/scripts
 bash evaluate_qwen.sh ${model_path} ${output_dir} ${summary_path}
