@@ -70,6 +70,37 @@ def str_to_pmatrix(input_str):
     return ", ".join(pmatrix_list)
 
 
+def convert_to_number(text):
+    import re
+
+    # 如果是科学计数法格式 (例如 3e8)
+    if 'e' in str(text).lower().replace("times", ""):
+        try:
+            result = float(text)
+            # 如果是整数，去掉小数点
+            if result.is_integer():
+                return int(result)
+            return result
+        except ValueError:
+            return text
+
+    # 匹配形如 a\times10^{n} 的格式
+    pattern = r'(\d+\.?\d*?)\\times10\^{?([+-]?\d+)}?'
+    match = re.search(pattern, str(text))
+
+    if match:
+        base = float(match.group(1))
+        exponent = int(match.group(2))
+        # 计算结果
+        result = base * (10 ** exponent)
+        # 如果是整数，去掉小数点
+        if result.is_integer():
+            return int(result)
+        return result
+
+    # 如果不匹配任何格式，返回原始文本
+    return text
+
 def math_equal(
     prediction: Union[bool, float, str],
     reference: Union[float, str],
@@ -95,6 +126,8 @@ def math_equal(
 
     try:  # 1. numerical equal
         if is_digit(prediction) and is_digit(reference):
+            if round_to_two_decimals(prediction) == round_to_two_decimals(reference):
+                return True
             prediction = parse_digits(prediction)
             reference = parse_digits(reference)
             # number questions
@@ -221,6 +254,8 @@ def math_equal(
             matched = False
         if matched:
             return True
+    if convert_to_number(prediction) == convert_to_number(reference):
+        return True
 
     if prediction.count("=") == 1 and reference.count("=") == 1:
         pred = prediction.split("=")
@@ -248,6 +283,19 @@ def math_equal(
         ):
             return True
 
+    if "=" in prediction or "=" in reference:
+        print("*"*20 + "post process works", prediction)
+        if math_equal(
+            prediction.split("=")[-1].replace("{", "("),
+            reference.split("=")[-1].replace("{", "("),
+            include_percentage, is_close
+        ):
+            return True
+
+    if convert_to_decimal(prediction) == convert_to_decimal(reference):
+        return True
+
+
     # symbolic equal with sympy
     if timeout:
         if call_with_timeout(symbolic_equal_process, prediction, reference):
@@ -255,6 +303,13 @@ def math_equal(
     else:
         if symbolic_equal(prediction, reference):
             return True
+
+    try:
+        if is_numbers_equal_post(clean_math_func_1(prediction), clean_math_func_1(reference)):
+            print("post process works")
+            return True
+    except:
+        pass
 
     return False
 
@@ -271,6 +326,100 @@ def numeric_equal(prediction: float, reference: float):
     # else:
     # prediction = round(prediction, len(str(reference).split(".")[-1]))
     return isclose(reference, prediction, rel_tol=1e-4)
+
+
+def round_to_two_decimals(num_str):
+    try:
+        num = float(num_str.replace(",", "").replace("\\", ""))
+        return round(num, 1)
+    except ValueError:
+        # print(f"无法将 '{num_str}' 转换为数字")
+        return None
+
+
+def clean_math_func_1(text):
+    #  \times10^{n}
+    pattern = r'(\d+\.?\d*?)\\times10\^{([+-]?\d+)}\\'
+    text = text.replace(",", "")
+    def replace_func(match):
+        number = float(match.group(1))
+        exponent = int(match.group(2))
+        return f"{number}e{exponent}"
+
+    result = re.sub(pattern, replace_func, text)
+    return result
+
+
+def convert_to_decimal(text):
+    import re
+
+    def scientific_to_decimal(base, exponent):
+        """将科学计数法转换为小数"""
+        return float(base) * (10 ** exponent)
+
+    # 如果是科学计数法格式 (1e-3)
+    if 'e' in str(text).lower():
+        try:
+            return format(float(text), 'f').rstrip('0').rstrip('.')
+        except ValueError:
+            return text
+
+    # 如果是10^{n}格式
+    pattern = r'10\^{([+-]?\d+)}'
+    match = re.search(pattern, str(text))
+    if match:
+        exponent = int(match.group(1))
+        return format(scientific_to_decimal(1, exponent), 'f').rstrip('0').rstrip('.')
+
+    # 如果是a\times10^{n}格式
+    pattern = r'(\d+\.?\d*?)\\times10\^{([+-]?\d+)}'
+    match = re.search(pattern, str(text))
+    if match:
+        base = float(match.group(1))
+        exponent = int(match.group(2))
+        return format(scientific_to_decimal(base, exponent), 'f').rstrip('0').rstrip('.')
+
+    # 如果都不是，返回原始文本
+    return text
+
+
+def is_numbers_equal_post(num1_str, num2_str, tolerance=1e-10):
+    def parse_scientific(s):
+        import re
+        if 'e' in s.lower():
+            return float(s)
+        s = s.replace("\\", "").replace(",", "")
+        match = re.search(r'(\d+\.?\d*?)times10\^{([+-]?\d+)}', s)
+        if match:
+            number = float(match.group(1))
+            exponent = int(match.group(2))
+            return number * (10 ** exponent)
+        return float(s)
+
+    try:
+        num1 = parse_scientific(num1_str)
+        num2 = parse_scientific(num2_str)
+    except ValueError as e:
+        # print(f"转换数字出错: {e}")
+        return False
+
+    def get_significant_digits(s):
+        s = str(s).lower()
+        if 'e' in s:
+            s = f"{float(s):f}"
+        s = s.rstrip('0').rstrip('.')
+        digits = ''.join(filter(str.isdigit, s))
+        return len(digits)
+
+    sig_digits = min(get_significant_digits(num1_str), get_significant_digits(num2_str))
+
+    scale = max(abs(num1), abs(num2))
+    if scale == 0:
+        return abs(num1 - num2) < tolerance
+
+    relative_tolerance = 0.5 * 10 ** (-(sig_digits - 1))
+
+    return abs(num1 - num2) / scale <= relative_tolerance
 
 
 def symbolic_equal(a, b):
@@ -385,10 +534,10 @@ def _test_math_equal():
     # pred = "(0.6,2.6667]"
     # gt = "(\\frac{3}{5},\\frac{8}{3}]"
 
-    gt = "x+2n+1"
-    pred = "x+1"
+    gt = "5.89e-7"
+    pred = "5.89\\times10^{-7}"
 
-    print(math_equal(pred, gt, timeout=True))
+    print(math_equal(gt, pred, timeout=True))
 
 
 if __name__ == "__main__":

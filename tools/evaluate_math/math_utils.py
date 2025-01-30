@@ -71,6 +71,23 @@ def percentage_to_fraction(text):
     return text
 
 
+def post_process(expr_str):
+    temp = expr_str.split("=")
+    expr_str = temp[1]
+
+    # 3.83\\times10^{35}\\, -> 3.83e35
+    pattern = r'(\d+\.?\d*?)\\times10\^{([+-]?\d+)}\\,'
+
+    def replace_func_1(match):
+        number = float(match.group(1))
+        exponent = int(match.group(2))
+        return f"{number}e{exponent}"
+
+    expr_str = re.sub(pattern, replace_func_1, expr_str)
+
+    return expr_str
+
+
 def clean_expr_str(expr_str):
     expr_str = (
         expr_str.replace(" . ", ".")
@@ -110,6 +127,7 @@ def clean_expr_str(expr_str):
     expr_str = (
         expr_str.replace("\\left", "").replace("\\right.", "").replace("\\right", "")
     )
+    expr_str = post_process(expr_str)
     return expr_str
 
 
@@ -206,7 +224,7 @@ def extract_answer_number(sentence: str) -> float:
     return pred[-1]
 
 
-@timeout_decorator.timeout(5)
+@timeout_decorator.timeout(10)
 def compare_ans(ans_p_str, ans_l_str, is_strict=False):
     ans_p_str = clean_expr_str(ans_p_str)
     ans_p_str = ans_p_str.replace(",", "").replace("$", "")
