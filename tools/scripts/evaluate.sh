@@ -1,7 +1,8 @@
 #!/bin/bash
 set -ex
 
-model_path="/path/to/model"
+#model_path="/path/to/model"
+model_path="/data/yubo/models/Qwen2.5-Math-7B"
 output_dir="../evaluation_output"
 summary_path="../evaluation_summary/summary.txt"
 
