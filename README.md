@@ -67,4 +67,17 @@ bash evaluate.sh
 
 Note: Our evaluation code is modified from [Qwen2.5-Math](https://github.com/QwenLM/Qwen2.5-Math) and [MAmmoTH](https://github.com/TIGER-AI-Lab/MAmmoTH).
 
+## Citation
 
+Cite our paper as
+```
+@misc{wang2025critiquefinetuninglearningcritique,
+      title={Critique Fine-Tuning: Learning to Critique is More Effective than Learning to Imitate},
+      author={Yubo Wang and Xiang Yue and Wenhu Chen},
+      year={2025},
+      eprint={2501.17703},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL},
+      url={https://arxiv.org/abs/2501.17703},
+}
+```
