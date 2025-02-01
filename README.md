@@ -67,7 +67,7 @@ bash evaluate.sh
 
 Note: Our evaluation code is modified from [Qwen2.5-Math](https://github.com/QwenLM/Qwen2.5-Math) and [MAmmoTH](https://github.com/TIGER-AI-Lab/MAmmoTH).
 
-# Construct Your Own Critique Data
+# Construct Critique Data
 
 To create your own critique data, you can use our data generation script:
 
