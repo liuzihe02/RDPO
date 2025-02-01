@@ -14,8 +14,14 @@ This repo contains the code for [Critique Fine-Tuning: Learning to Critique is M
 <img style="height:22pt" src="https://img.shields.io/badge/-🤗%20Models-red?style=flat"></a>
 <br>
 
+## Highlights
+Our fine-tuning method can achieve on par results with RL training!
+
+<img width="1432" alt="abs" src="https://tiger-ai-lab.github.io/CritiqueFineTuning/static/images/teaser.png">
+
+
 ## News
-- **[2025/01/30]** ⚡️ The paper, code, data, and model for CritiqueFineTuning are all available online. 
+- **[2025/01/30]** ⚡️ The paper, code, data, and model for CritiqueFineTuning are all available online.
 
 ## Getting Started
 
