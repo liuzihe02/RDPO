@@ -67,6 +67,17 @@ bash evaluate.sh
 
 Note: Our evaluation code is modified from [Qwen2.5-Math](https://github.com/QwenLM/Qwen2.5-Math) and [MAmmoTH](https://github.com/TIGER-AI-Lab/MAmmoTH).
 
+# Construct Your Own Critique Data
+
+To create your own critique data, you can use our data generation script:
+
+```bash
+cd tools/self_construct_critique_data
+bash run.sh
+```
+Simply modify the model_name parameter in run.sh to specify which model you want to use as the critique teacher. The script will generate critique data following our paper's approach.
+
+
 ## Citation
 
 Cite our paper as
