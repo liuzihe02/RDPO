@@ -89,6 +89,7 @@ def process_large_dataset(model_name: str,
             answer = input_str.split("\n\nSolution:\n")[1]
             data.append({"question": question, "answer": answer})
     else:
+        # opc-sft-stage2_data also use this
         with open(input_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
     total_items = len(data)
@@ -144,7 +145,7 @@ def example_prompt_func(item):
             "content": [
                 {
                     "type": "text",
-                    "text": "You are a science expert. A student is trying to solve the a question, please explain briefly whether his solution is correct or not. Finally, conclude your judgement with 'Conclusion: right/wrong [END]'."
+                    "text": "You are a science expert. A student is trying to solve a question, please explain briefly whether his solution is correct or not. Finally, conclude your judgement with 'Conclusion: right/wrong [END]'."
                 }
             ]
         },
