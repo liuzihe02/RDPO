@@ -14,12 +14,18 @@ This repo contains the code for [Critique Fine-Tuning: Learning to Critique is M
 <img style="height:22pt" src="https://img.shields.io/badge/-🤗%20Models-red?style=flat"></a>
 <br>
 
-# News
-- **[2025/01/30]** ⚡️ The paper, code, data, and model for CritiqueFineTuning are all available online. 
+## Highlights
+Our fine-tuning method can achieve on par results with RL training!
 
-# Getting Started
+<img width="1432" alt="abs" src="https://tiger-ai-lab.github.io/CritiqueFineTuning/static/images/teaser.png">
 
-## Installation
+
+## News
+- **[2025/01/30]** ⚡️ The paper, code, data, and model for CritiqueFineTuning are all available online.
+
+## Getting Started
+
+### Installation
 
 1. First install LLaMA-Factory:
 ```bash
@@ -31,7 +37,7 @@ pip install -e ".[torch,metrics]"
 2. Install additional requirements:
 pip install -r requirements.txt
 
-## Training Steps
+### Training Steps
 
 1. First, clone the repository and download the dataset:
 ```bash
@@ -57,7 +63,7 @@ bash start_validate.sh
 ```
 This will create a validation_summary.txt file containing MATH-500 scores for each checkpoint. Select the checkpoint with the highest score as your final model.
 
-# Evaluation
+## Evaluation
 
 Fill in the model path and evaluation result save path in tools/scripts/evaluate.sh, then run:
 ```bash
@@ -67,7 +73,7 @@ bash evaluate.sh
 
 Note: Our evaluation code is modified from [Qwen2.5-Math](https://github.com/QwenLM/Qwen2.5-Math) and [MAmmoTH](https://github.com/TIGER-AI-Lab/MAmmoTH).
 
-# Construct Your Own Critique Data
+## Construct Critique Data
 
 To create your own critique data, you can use our data generation script:
 

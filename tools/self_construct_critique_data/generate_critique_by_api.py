@@ -132,13 +132,11 @@ def process_large_dataset(model_name: str,
 
 
 def example_prompt_func(item):
-    question = item["question"]
-    original_answer = item["answer"]
-    question = f"""
-    Question: {question}
+    query = f"""
+Question: {item["question"]}
 
-    Solution: {original_answer}
-    """
+Solution: {item["answer"]}
+"""
     chat_prompt = [
         {
             "role": "system",
@@ -154,7 +152,7 @@ def example_prompt_func(item):
             "content": [
                 {
                     "type": "text",
-                    "text": question
+                    "text": query
                 }
             ]
         },
