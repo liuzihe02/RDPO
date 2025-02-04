@@ -89,7 +89,6 @@ def process_large_dataset(model_name: str,
             answer = input_str.split("\n\nSolution:\n")[1]
             data.append({"question": question, "answer": answer})
     else:
-        # opc-sft-stage2_data also use this
         with open(input_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
     total_items = len(data)
