@@ -1,10 +1,17 @@
 # Reasoning DPO
 
-This is a fork of the Critique Fine Tuning repo, made for initial experimentation
+- This is a fork of the Critique Fine Tuning repo, made for initial experimentation
+- As reccomended with LlamaFactory, we use `uv` for package management, use the reccomended versions from their github page
+```bash
+#make a uv venv and run the following
+uv pip install -r requirements.txt --no-build-isolation
+```
+- need to modify the `data/datasets_info.json` for any new data
+  - Because we use our own copy of LlamaFactory, we may run into some issues
 
 ## Notes
 
-- `LlamaFactory` is stored in the `train/` subdirectory
+- `LlamaFactory` is stored in the `train/` subdirectory, install it in the train subdir before running anything
 
 ---
 

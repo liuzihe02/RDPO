@@ -5,9 +5,16 @@ python_dateutil
 flash_attn
 
 # math_eval
-sympy==1.12
+# sympy==1.12 # old version of sympy that was incompatible
+sympy==1.13.1
 antlr4-python3-runtime==4.11.1 # ! The version needs to be compatible with sympy.
 word2number
 Pebble
 timeout-decorator
 latex2sympy2
+
+#zachs extra packages, take the dependencies from LlamaFactory github requirements
+deepspeed==0.16.2
+torch
+metrics
+flash-attn==2.7.2.post1
