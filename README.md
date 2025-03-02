@@ -1,3 +1,13 @@
+# Reasoning DPO
+
+This is a fork of the Critique Fine Tuning repo, made for initial experimentation
+
+## Notes
+
+- `LlamaFactory` is stored in the `train/` subdirectory
+
+---
+
 # CritiqueFineTuning
 
 This repo contains the code for [Critique Fine-Tuning: Learning to Critique is More Effective than Learning to Imitate](https://arxiv.org/abs/2501.17703). In this paper, we introduce Critique Fine-Tuning (CFT) - a paradigm shift in LLM training where models learn to critique rather than imitate!  

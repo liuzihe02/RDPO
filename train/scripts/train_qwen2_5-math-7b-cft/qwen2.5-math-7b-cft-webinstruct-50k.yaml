@@ -3,14 +3,21 @@ model_name_or_path: /path/to/Qwen2.5-Math-7B
 trust_remote_code: true
 
 ### method
+
+#what kind of training
 stage: sft
+#true for training, false for eval
 do_train: true
 do_eval: false
+#Fine-tuning method. Optional: freeze, lora, full
 finetuning_type: full
 deepspeed: examples/deepspeed/ds_z3_config.json  # choices: [ds_z0_config.json, ds_z2_config.json, ds_z3_config.json]
 
 ### dataset
+
+#must exist locally
 dataset: WebInstruct-CFT-50K
+#Dataset template, please ensure that the dataset template corresponds to the model.
 template: qwen
 cutoff_len: 2048
 max_samples: 100000

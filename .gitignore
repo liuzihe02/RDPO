@@ -4,3 +4,10 @@
 *.swo
 .DS_Store
 local*
+
+#ignore venvs
+venv/
+
+#ignore the llama factory stuff
+# Ignore any folder that begins with llamafactory
+train/LLaMA-Factory

@@ -19,7 +19,7 @@ def download_and_save_datasets(output_path, selected_configs=None):
     available_configs = {
         "600k": "WebInstruct-CFT-600K",
         "50k": "WebInstruct-CFT-50K",
-        "4k": "WebInstruct-CFT-4K"
+        "4k": "WebInstruct-CFT-4K",
     }
 
     # If no configs specified, use all configs
@@ -45,14 +45,14 @@ def download_and_save_datasets(output_path, selected_configs=None):
             dataset = load_dataset("TIGER-Lab/WebInstruct-CFT", config)
 
             # Get training data
-            train_data = dataset['train']
+            train_data = dataset["train"]
 
             # Convert to list format
             data_list = train_data.to_list()
 
             # Save as JSON file
             output_file = os.path.join(output_path, f"{config}.json")
-            with open(output_file, 'w', encoding='utf-8') as f:
+            with open(output_file, "w", encoding="utf-8") as f:
                 json.dump(data_list, f, ensure_ascii=False, indent=2)
 
             print(f"{config} has been saved to {output_file}")
@@ -63,16 +63,30 @@ def download_and_save_datasets(output_path, selected_configs=None):
 
 def main():
     # Set up command line argument parser
-    parser = argparse.ArgumentParser(description='Download WebInstruct-CFT datasets')
-    parser.add_argument('--output', '-o', type=str, default='../../train/LLaMA-Factory/data',
-                        help='Output directory path')
-    parser.add_argument('--configs', '-c', nargs='*',
-                        choices=['600k', '50k', '4k'],
-                        help='Configurations to download, multiple choices allowed. Example: -c 600k 50k')
+    parser = argparse.ArgumentParser(description="Download WebInstruct-CFT datasets")
+
+    # note that we current have 2 copies of Llamafactory, this has been copied to the training version
+    parser.add_argument(
+        "--output",
+        "-o",
+        type=str,
+        default="../../train/LLaMA-Factory/data",
+        help="Output directory path",
+    )
+    parser.add_argument(
+        "--configs",
+        "-c",
+        nargs="*",
+        choices=["600k", "50k", "4k"],
+        help="Configurations to download, multiple choices allowed. Example: -c 600k 50k",
+    )
 
     args = parser.parse_args()
 
-    print("Selected configurations:", args.configs if args.configs else "all configurations")
+    print(
+        "Selected configurations:",
+        args.configs if args.configs else "all configurations",
+    )
     print("Output path:", args.output)
 
     download_and_save_datasets(args.output, args.configs)
@@ -80,4 +94,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
