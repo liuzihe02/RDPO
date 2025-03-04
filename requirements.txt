@@ -1,4 +1,5 @@
-vllm==0.6.6
+#cft requirements
+vllm>=0.4.3 #i have adjusted this to be flexible accomodate for deepspeed
 tqdm
 datasets
 python_dateutil
@@ -15,6 +16,7 @@ latex2sympy2
 
 #zachs extra packages, take the dependencies from LlamaFactory github requirements
 deepspeed==0.16.2
-torch
+torch==2.4.0
 metrics
 flash-attn==2.7.2.post1
+bitsandbytes==0.43.1
