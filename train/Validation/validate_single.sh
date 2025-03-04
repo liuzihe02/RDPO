@@ -26,6 +26,8 @@ python3 -u math_eval.py \
     --top_p 1 \
     --start 0 \
     --end -1 \
-    --use_vllm \
+    # you might want to increase this max tokens for actual qwen usage
+    --max_tokens_per_call 1024 \ 
+    # --use_vllm \ #we dont use vllm here as it causes some issues
     --save_outputs \
     # --overwrite \

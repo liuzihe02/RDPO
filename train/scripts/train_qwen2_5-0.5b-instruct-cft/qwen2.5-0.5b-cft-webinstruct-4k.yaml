@@ -1,7 +1,7 @@
 ### model
-model_name_or_path: Qwen/Qwen2.5-0.5B-Instruct
+model_name_or_path: openai-community/gpt2
 #qlora
-quantization_bit: 4
+quantization_bit: 8
 quantization_method: bitsandbytes  # choices: [bitsandbytes (4/8), hqq (2/3/4/5/6/8), eetq (8)]
 trust_remote_code: true
 
@@ -16,15 +16,15 @@ do_eval: false
 finetuning_type: lora
 lora_rank: 2
 lora_target: all
-deepspeed: examples/deepspeed/ds_z3_config.json  # choices: [ds_z0_config.json, ds_z2_config.json, ds_z3_config.json]
+#deepspeed: examples/deepspeed/ds_z3_config.json  # choices: [ds_z0_config.json, ds_z2_config.json, ds_z3_config.json]
 
 ### dataset
 
 #must exist locally, in the LlamaFactory dataset folder
 dataset: WebInstruct-CFT-4K
 #Dataset template, please ensure that the dataset template corresponds to the model.
-template: qwen
-cutoff_len: 2048
+#template: qwen
+cutoff_len: 512
 max_samples: 100000
 overwrite_cache: true
 preprocessing_num_workers: 16
