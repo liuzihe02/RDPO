@@ -83,7 +83,9 @@ def prepare_data(data_name, args):
     if not os.path.exists(output_dir):
         # output_dir = f"outputs/{output_dir}"
         os.makedirs(output_dir, exist_ok=True)
-    out_file = f"{output_dir}/{data_name}/{out_file_prefix}_s{args.start}_e{args.end}.jsonl"
+    out_file = (
+        f"{output_dir}/{data_name}/{out_file_prefix}_s{args.start}_e{args.end}.jsonl"
+    )
     os.makedirs(f"{output_dir}/{data_name}", exist_ok=True)
 
     # load all processed samples
@@ -95,9 +97,7 @@ def prepare_data(data_name, args):
             if f.endswith(".jsonl") and f.startswith(out_file_prefix)
         ]
         for f in processed_files:
-            processed_samples.extend(
-                list(load_jsonl(f"{output_dir}/{data_name}/{f}"))
-            )
+            processed_samples.extend(list(load_jsonl(f"{output_dir}/{data_name}/{f}")))
 
     # dedepulicate
     processed_samples = {sample["idx"]: sample for sample in processed_samples}
@@ -233,7 +233,15 @@ def main(llm, tokenizer, data_name, args):
 
     max_func_call = 1 if args.prompt_type in ["cot", "pal"] else 4
 
-    stop_words = ["</s>", "<|im_end|>", "<|endoftext|>", "(END)", "\\[END\\]", "**END**", "[END]"]
+    stop_words = [
+        "</s>",
+        "<|im_end|>",
+        "<|endoftext|>",
+        "(END)",
+        "\\[END\\]",
+        "**END**",
+        "[END]",
+    ]
 
     if args.prompt_type in ["cot"]:
         stop_words.append("\n\nQuestion:")
@@ -405,7 +413,7 @@ def main(llm, tokenizer, data_name, args):
 
     summary_path = args.summary_path
     with open(summary_path, "a") as fo:
-        fo.write(summary_prefix + ' Final Accuracy: ' + str(acc) + "\n")
+        fo.write(summary_prefix + " Final Accuracy: " + str(acc) + "\n")
 
     with open(
         out_file.replace(".jsonl", f"_{args.prompt_type}_metrics.json"), "w"

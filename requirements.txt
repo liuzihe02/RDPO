@@ -20,3 +20,4 @@ torch==2.4.0
 metrics
 flash-attn==2.7.2.post1
 bitsandbytes==0.43.2
+transformers==4.49.0

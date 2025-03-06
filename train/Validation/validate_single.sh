@@ -5,7 +5,7 @@ MODEL_NAME_OR_PATH=$1
 OUTPUT_DIR=$2
 SUMMARY_PATH=$3
 SPLIT="test"
-NUM_TEST_SAMPLE=-1
+NUM_TEST_SAMPLE=10
 
 mkdir -p $OUTPUT_DIR
 cd ../../tools/evaluate_math
@@ -26,8 +26,6 @@ python3 -u math_eval.py \
     --top_p 1 \
     --start 0 \
     --end -1 \
-    # you might want to increase this max tokens for actual qwen usage
-    --max_tokens_per_call 256 \ 
-    # --use_vllm \ #we dont use vllm here as it causes some issues
+    --max_tokens_per_call 1024 \
     --save_outputs \
-    # --overwrite \
+    --use_safetensors
