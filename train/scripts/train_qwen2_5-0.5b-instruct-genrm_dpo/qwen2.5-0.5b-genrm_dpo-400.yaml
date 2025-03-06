@@ -35,9 +35,9 @@ preprocessing_num_workers: 16
 # overwrite_cache: true
 
 ### output
-output_dir: output_models/qwen2.5-0.5b-genrm_dpo
+output_dir: output_models/qwen2.5-0.5b-genrm_dpo-400
 logging_steps: 1
-save_steps: 20
+save_steps: 10
 plot_loss: true
 overwrite_output_dir: true
 save_only_model: true
@@ -48,7 +48,7 @@ per_device_train_batch_size: 2
 #best to keep the same or increase
 gradient_accumulation_steps: 8
 learning_rate: 5.0e-6
-num_train_epochs: 1.0
+num_train_epochs: 2.0
 lr_scheduler_type: cosine
 warmup_ratio: 0.1
 bf16: true

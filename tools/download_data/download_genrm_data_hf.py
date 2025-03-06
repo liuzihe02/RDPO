@@ -309,15 +309,14 @@ def main():
 
     # Save the master dataset as a JSON file
     master_data = master_df.to_dict(orient="records")
-    # we double the number of samples since we use have one correct and one incorrect sample
+    # note the number of samples here will be doubled, because each question has one correct and one incorrect answer
     master_filename = f"data_genrm_master_{args.num_samples * 2}.json"
     # # optional to save the master dataset as we dont actually use this dataset for direct training
     # save_dataset(master_data, master_filename, args.output)
 
     # Create and save the DPO dataset
     dpo_data = create_dpo_dataset(master_df)
-    # we double the number of samples since we use both one correct and one incorrect sample for DPO
-    dpo_filename = f"data_genrm_dpo_{args.num_samples * 2}.json"
+    dpo_filename = f"data_genrm_dpo_{args.num_samples}.json"
     save_dataset(dpo_data, dpo_filename, args.output)
 
     # Create and save the SFT dataset without verification
