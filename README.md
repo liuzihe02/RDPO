@@ -12,6 +12,8 @@ uv pip install -r requirements.txt --no-build-isolation
 ## Notes
 
 - `LlamaFactory` is stored in the `train/` subdirectory, install it in the train subdir before running anything
+- Cutoff length and batch size significantly affects memory usage
+- Deepspeed3 doesnt work with bitsandbytes for some reason
 
 ---
 
