@@ -6,7 +6,7 @@
 #make a uv venv and run the following
 uv pip install -r requirements.txt --no-build-isolation
 ```
-- need to modify the `data/datasets_info.json` for any new data
+- need to modify the `data/datasets_info.json` in `LLaMa-Factory` anytime you add new data
   - Because we use our own copy of LlamaFactory, we may run into some issues
 
 ## Notes
@@ -24,7 +24,11 @@ We use the [GenRM](https://huggingface.co/datasets/flowingpurplecrane/genrm) dat
 
 1. DPO w/o verification
 2. SFT w/o verification
+   - We only use the correct answers
 3. SFT w/ verification
+   - We only use the correct answers
+
+We use a subset of `num_samples`, where we select a pair of correct and incorrect answer for each sample.
 
 ---
 

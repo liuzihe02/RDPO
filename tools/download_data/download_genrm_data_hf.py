@@ -12,6 +12,8 @@ import random
 import pandas as pd
 from tqdm import tqdm
 
+random.seed(0)
+
 
 def extract_problem(inputs_text):
     """Extract the problem from the inputs column, including '\nQ:' but excluding '\nA:'."""
@@ -84,6 +86,9 @@ def process_master_dataset(dataset, num_samples):
     # Convert to pandas for easier processing
     df = pd.DataFrame(dataset)
 
+    # filter away values where target is null
+    df.dropna(subset=["target"])
+
     # the instruction is the same for everyone
 
     # Extract required fields
@@ -91,6 +96,7 @@ def process_master_dataset(dataset, num_samples):
     df["correct"] = df["targets"].progress_apply(is_correct)
     df["problem"] = df["inputs"].progress_apply(extract_problem)
     df["answer"] = df["inputs"].progress_apply(extract_answer)
+    # instruction is fixed. this insturction is for non-verification training
     df["instruction"] = (
         """Solve the math problems and provide step-by-step solutions, ending with \"The answer is [Insert Final Answer Here]\"."""
     )
@@ -303,35 +309,38 @@ def main():
 
     # Save the master dataset as a JSON file
     master_data = master_df.to_dict(orient="records")
-    master_filename = f"data_genrm_master_{args.num_samples}.json"
-    save_dataset(master_data, master_filename, args.output)
+    # we double the number of samples since we use have one correct and one incorrect sample
+    master_filename = f"data_genrm_master_{args.num_samples * 2}.json"
+    # # optional to save the master dataset as we dont actually use this dataset for direct training
+    # save_dataset(master_data, master_filename, args.output)
 
-    # # Create and save the DPO dataset
-    # dpo_data = create_dpo_dataset(master_df)
-    # dpo_filename = f"data_genrm_dpo_{args.num_samples}.json"
-    # save_dataset(dpo_data, dpo_filename, args.output)
+    # Create and save the DPO dataset
+    dpo_data = create_dpo_dataset(master_df)
+    # we double the number of samples since we use both one correct and one incorrect sample for DPO
+    dpo_filename = f"data_genrm_dpo_{args.num_samples * 2}.json"
+    save_dataset(dpo_data, dpo_filename, args.output)
 
-    # # Create and save the SFT dataset without verification
-    # sft_no_veri_data = create_sft_no_veri_dataset(master_df)
-    # sft_no_veri_filename = f"data_genrm_sft_no_veri_{args.num_samples}.json"
-    # save_dataset(sft_no_veri_data, sft_no_veri_filename, args.output)
+    # Create and save the SFT dataset without verification
+    sft_no_veri_data = create_sft_no_veri_dataset(master_df)
+    sft_no_veri_filename = f"data_genrm_sft_no_veri_{args.num_samples}.json"
+    save_dataset(sft_no_veri_data, sft_no_veri_filename, args.output)
 
-    # # Create and save the SFT dataset with verification
-    # sft_veri_data = create_sft_veri_dataset(master_df)
-    # sft_veri_filename = f"data_genrm_sft_veri_{args.num_samples}.json"
-    # save_dataset(sft_veri_data, sft_veri_filename, args.output)
+    # Create and save the SFT dataset with verification
+    sft_veri_data = create_sft_veri_dataset(master_df)
+    sft_veri_filename = f"data_genrm_sft_veri_{args.num_samples}.json"
+    save_dataset(sft_veri_data, sft_veri_filename, args.output)
 
-    # # Print summary
-    # print("\nDataset processing complete!")
-    # print(
-    #     f"- Created master dataset with {len(master_df['question_id'].unique())} unique questions"
-    # )
-    # print(f"- Created DPO dataset with {len(dpo_data)} examples")
-    # print(
-    #     f"- Created SFT without verification dataset with {len(sft_no_veri_data)} examples"
-    # )
-    # print(f"- Created SFT with verification dataset with {len(sft_veri_data)} examples")
-    # print(f"\nAll files saved to: {args.output}")
+    # Print summary
+    print("\nDataset processing complete!")
+    print(
+        f"- Created master dataset with {len(master_df['question_id'].unique())} unique questions"
+    )
+    print(f"- Created DPO dataset with {len(dpo_data)} examples")
+    print(
+        f"- Created SFT without verification dataset with {len(sft_no_veri_data)} examples"
+    )
+    print(f"- Created SFT with verification dataset with {len(sft_veri_data)} examples")
+    print(f"\nAll files saved to: {args.output}")
 
 
 if __name__ == "__main__":
