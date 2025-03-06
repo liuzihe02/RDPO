@@ -18,6 +18,14 @@ uv pip install -r requirements.txt --no-build-isolation
 - Provide absolute file paths for evaluation scripts
 - Decrease number of samples for validation to speed it up
 
+## Experiments
+
+We use the [GenRM](https://huggingface.co/datasets/flowingpurplecrane/genrm) dataset to run some initial experiments:
+
+1. DPO w/o verification
+2. SFT w/o verification
+3. SFT w/ verification
+
 ---
 
 # CritiqueFineTuning
