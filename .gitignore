@@ -15,3 +15,11 @@ train/LLaMA-Factory
 
 #ignore cache
 *.pyc
+
+# Ignore all JSON files
+*.json
+# Ignore all JSONL files
+*.jsonl
+
+# Ignore all files with 'checkpoint' in the filename
+*checkpoint*

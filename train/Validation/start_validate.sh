@@ -4,7 +4,7 @@ set -ex
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 
 model_dir="/home/flowingpurplecrane/RDPO/train/LLaMA-Factory/output_models/qwen2.5-0.5B-cft_WebInstruct-CFT-4K"
-summary_path="validation_summary.txt"
+summary_path="/home/flowingpurplecrane/RDPO/train/Validation/validation_summary.txt"
 
 models_dir_name=$(basename "$model_dir")
 summary_parent_dir=$(dirname "$summary_path")
