@@ -24,3 +24,7 @@ train/LLaMA-Factory
 # Ignore all files with 'checkpoint' and 'results' in the filename
 *checkpoint*
 *results*
+
+#ignore the backup folder
+.gitbackup
+.gitbackup/
