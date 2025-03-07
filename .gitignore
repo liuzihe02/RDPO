@@ -21,5 +21,6 @@ train/LLaMA-Factory
 # Ignore all JSONL files
 *.jsonl
 
-# Ignore all files with 'checkpoint' in the filename
+# Ignore all files with 'checkpoint' and 'results' in the filename
 *checkpoint*
+*results*

@@ -3,9 +3,6 @@ set -ex
 
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 
-#disable connections with HF
-export HF_HUB_OFFLINE=1
-
 #this directory contains many subdirectories. Each subdirectory is a checkpoint directory
 #model_dir="../LLaMA-Factory/output_models/qwen2.5-0.5b-genrm_dpo-2000"
 model_dir="/home/flowingpurplecrane/RDPO/train/LLaMA-Factory/output_models/qwen2.5-0.5b-genrm_dpo-2000"
@@ -13,14 +10,14 @@ model_dir="/home/flowingpurplecrane/RDPO/train/LLaMA-Factory/output_models/qwen2
 output_dir="/home/flowingpurplecrane/RDPO/train/validation"
 
 #number of samples to use for validation
-num_samples=50
+num_samples=10
 
 #get the model name
 model_name=$(basename "$model_dir")
 
 # create the results folder in the output_dir
 # we temporarily create the name first
-results_dir="${output_dir}/${model_name}"
+results_dir="${output_dir}/results_${model_name}"
 
 # Check if the results_dir already exists
 if [ -d "$results_dir" ]; then
