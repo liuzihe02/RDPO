@@ -6,7 +6,7 @@ OUTPUT_DIR=$2
 SUMMARY_PATH=$3
 SPLIT="test"
 #this is an important parameter which decides how many test samples we want
-NUM_TEST_SAMPLE=10
+NUM_TEST_SAMPLE=$4
 
 mkdir -p $OUTPUT_DIR
 cd ../../tools/evaluate_math

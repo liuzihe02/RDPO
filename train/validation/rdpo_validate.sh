@@ -3,19 +3,23 @@ set -ex
 
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 
+#disable connections with HF
+export HF_HUB_OFFLINE=1
+
 #this directory contains many subdirectories. Each subdirectory is a checkpoint directory
-model_dir=/home/flowingpurplecrane/RDPO/train/LLaMA-Factory/output_models/qwen2.5-0.5b-genrm_dpo-400
+#model_dir="../LLaMA-Factory/output_models/qwen2.5-0.5b-genrm_dpo-2000"
+model_dir="/home/flowingpurplecrane/RDPO/train/LLaMA-Factory/output_models/qwen2.5-0.5b-genrm_dpo-2000"
 #we will create a results directory here.
 output_dir="/home/flowingpurplecrane/RDPO/train/validation"
 
+#number of samples to use for validation
+num_samples=50
 
 #get the model name
 model_name=$(basename "$model_dir")
 
-# Create model directory in output directory
-results_dir="${output_dir}/${model_name}"
-
-# Create model directory in output directory
+# create the results folder in the output_dir
+# we temporarily create the name first
 results_dir="${output_dir}/${model_name}"
 
 # Check if the results_dir already exists
@@ -40,7 +44,7 @@ for checkpoint_dir in ${model_dir}/checkpoint-*; do
             checkpoint_output="${results_dir}/checkpoint-${checkpoint_num}/"
             
             echo "Processing checkpoint-${checkpoint_num}"
-            bash validate_single.sh "$checkpoint_dir" "$checkpoint_output" "$summary_path"
+            bash validate_single.sh "$checkpoint_dir" "$checkpoint_output" "$summary_path" "$num_samples"
         else
             echo "Skipping checkpoint-${checkpoint_num} (≥ 100)"
         fi

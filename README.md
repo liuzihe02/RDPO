@@ -6,17 +6,19 @@
 #make a uv venv and run the following
 uv pip install -r requirements.txt --no-build-isolation
 ```
-- need to modify the `data/datasets_info.json` in `LLaMa-Factory` anytime you add new data
+- need to modify the `data/datasets_info.json` in `LLaMa-Factory` **anytime you add new data**
   - Because we use our own copy of LlamaFactory, we may run into some issues
 
 ## Notes
 
 - `LlamaFactory` is stored in the `train/` subdirectory, install it in the train subdir before running anything
   - Data is stored in the LlamaFactory folder
-- Cutoff length and batch size significantly affects memory usage
+- `cutoff_len` and `per_device_train_batch_size` are by far largest factors controlling memory usage
+  - Play around with this to just nice fit on device
 - Deepspeed3 doesnt work with bitsandbytes for some reason
 - Provide absolute file paths for evaluation scripts
 - Decrease number of samples for validation to speed it up
+  - If size of training dataset too big, also memory issues
 
 ## Experiments
 
