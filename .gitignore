@@ -26,5 +26,5 @@ train/LLaMA-Factory
 *results*
 
 #ignore the backup folder
-.gitbackup
-.gitbackup/
+.git_backup
+.git_backup/
