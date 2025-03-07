@@ -1,7 +1,0 @@
-/home/flowingpurplecrane/RDPO/train/Validation/qwen2.5-0.5B-cft_WebInstruct-CFT-4K-checkpoint-10/math-500 2025-03-06 12:10:14 Final Accuracy: 40.0
-/home/flowingpurplecrane/RDPO/train/Validation/qwen2.5-0.5B-cft_WebInstruct-CFT-4K-checkpoint-20/math-500 2025-03-06 12:11:27 Final Accuracy: 20.0
-/home/flowingpurplecrane/RDPO/train/Validation/qwen2.5-0.5B-cft_WebInstruct-CFT-4K-checkpoint-30/math-500 2025-03-06 12:12:58 Final Accuracy: 50.0
-/home/flowingpurplecrane/RDPO/train/Validation/qwen2.5-0.5B-cft_WebInstruct-CFT-4K-checkpoint-40/math-500 2025-03-06 12:14:17 Final Accuracy: 40.0
-/home/flowingpurplecrane/RDPO/train/Validation/qwen2.5-0.5B-cft_WebInstruct-CFT-4K-checkpoint-50/math-500 2025-03-06 12:15:35 Final Accuracy: 40.0
-/home/flowingpurplecrane/RDPO/train/Validation/qwen2.5-0.5B-cft_WebInstruct-CFT-4K-checkpoint-60/math-500 2025-03-06 12:16:31 Final Accuracy: 50.0
-/home/flowingpurplecrane/RDPO/train/Validation/qwen2.5-0.5B-cft_WebInstruct-CFT-4K-checkpoint-62/math-500 2025-03-06 12:17:46 Final Accuracy: 40.0

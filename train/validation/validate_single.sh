@@ -5,6 +5,7 @@ MODEL_NAME_OR_PATH=$1
 OUTPUT_DIR=$2
 SUMMARY_PATH=$3
 SPLIT="test"
+#this is an important parameter which decides how many test samples we want
 NUM_TEST_SAMPLE=10
 
 mkdir -p $OUTPUT_DIR
@@ -12,6 +13,8 @@ cd ../../tools/evaluate_math
 
 DATA_NAME="math-500"
 TOKENIZERS_PARALLELISM=false \
+#the max tokens is an important parameter
+#we also added use_safetensors
 python3 -u math_eval.py \
     --model_name_or_path ${MODEL_NAME_OR_PATH} \
     --data_name ${DATA_NAME} \
@@ -29,3 +32,4 @@ python3 -u math_eval.py \
     --max_tokens_per_call 1024 \
     --save_outputs \
     --use_safetensors
+

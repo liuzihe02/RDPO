@@ -37,7 +37,7 @@ preprocessing_num_workers: 16
 ### output
 output_dir: output_models/qwen2.5-0.5b-genrm_dpo-400
 logging_steps: 1
-save_steps: 10
+save_steps: 2
 plot_loss: true
 overwrite_output_dir: true
 save_only_model: true

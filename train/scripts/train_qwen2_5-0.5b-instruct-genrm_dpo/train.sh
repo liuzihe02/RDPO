@@ -18,4 +18,19 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 MODEL_NAME="rdpo"
 export WANDB_RUN_NAME=$MODEL_NAME
 
-FORCE_TORCHRUN=1 llamafactory-cli train ../scripts/train_qwen2_5-0.5b-instruct-genrm_dpo/qwen2.5-0.5b-genrm_dpo-400.yaml
+# Get config file path
+CONFIG_FILE="../scripts/train_qwen2_5-0.5b-instruct-genrm_dpo/qwen2.5-0.5b-genrm_dpo-400.yaml"
+
+# Extract output directory from yaml file using grep with a pattern that anchors to the beginning of the line
+OUTPUT_DIR=$(grep -m1 "^output_dir:" "$CONFIG_FILE" | cut -d':' -f2 | tr -d ' ')
+
+# Check if output directory exists
+if [ -d "$OUTPUT_DIR" ]; then
+    echo "Error: Output directory '$OUTPUT_DIR' already exists. Aborting to prevent overwrite."
+    exit 1
+else
+    echo "Output directory '$OUTPUT_DIR' does not exist. Safe to proceed."
+fi
+
+# Continue with training if the directory doesn't exist
+FORCE_TORCHRUN=1 llamafactory-cli train $CONFIG_FILE
