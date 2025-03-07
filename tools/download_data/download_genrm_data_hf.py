@@ -310,23 +310,23 @@ def main():
     # Save the master dataset as a JSON file
     master_data = master_df.to_dict(orient="records")
     # note the number of samples here will be doubled, because each question has one correct and one incorrect answer
-    master_filename = f"data_genrm_master_{args.num_samples * 2}.json"
+    master_filename = f"data-genrm-master-{args.num_samples * 2}.json"
     # # optional to save the master dataset as we dont actually use this dataset for direct training
     # save_dataset(master_data, master_filename, args.output)
 
     # Create and save the DPO dataset
     dpo_data = create_dpo_dataset(master_df)
-    dpo_filename = f"data_genrm_dpo_{args.num_samples}.json"
+    dpo_filename = "data-genrm-dpo.json"
     save_dataset(dpo_data, dpo_filename, args.output)
 
     # Create and save the SFT dataset without verification
     sft_no_veri_data = create_sft_no_veri_dataset(master_df)
-    sft_no_veri_filename = f"data_genrm_sft_no_veri_{args.num_samples}.json"
+    sft_no_veri_filename = "data-genrm-sft-no_veri.json"
     save_dataset(sft_no_veri_data, sft_no_veri_filename, args.output)
 
     # Create and save the SFT dataset with verification
     sft_veri_data = create_sft_veri_dataset(master_df)
-    sft_veri_filename = f"data_genrm_sft_veri_{args.num_samples}.json"
+    sft_veri_filename = "data-genrm-sft-veri.json"
     save_dataset(sft_veri_data, sft_veri_filename, args.output)
 
     # Print summary

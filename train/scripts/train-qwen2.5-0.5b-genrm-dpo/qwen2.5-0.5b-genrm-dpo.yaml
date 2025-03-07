@@ -1,0 +1,56 @@
+### model
+model_name_or_path: Qwen/Qwen2.5-0.5B-Instruct
+#qlora
+quantization_bit: 4
+quantization_method: bitsandbytes  # choices: [bitsandbytes (4/8), hqq (2/3/4/5/6/8), eetq (8)]
+trust_remote_code: true
+
+### method
+
+#what kind of training
+stage: dpo
+#true for training, false for eval
+do_train: true
+do_eval: false
+#Fine-tuning method. Optional: freeze, lora, full
+finetuning_type: lora
+lora_rank: 2
+lora_target: all
+deepspeed: examples/deepspeed/ds_z2_offload_config.json  # choices: [ds_z0_config.json, ds_z2_config.json, ds_z3_config.json]
+pref_beta: 0.1
+pref_loss: sigmoid  # choices: [sigmoid (dpo), orpo, simpo]
+
+### dataset
+
+#must exist locally, in the LlamaFactory dataset folder
+dataset: genrm_dpo
+#Dataset template, please ensure that the dataset template corresponds to the model.
+template: qwen
+#this can significantly affect cuda memory use
+cutoff_len: 450
+#subset of entire training set, for experimentation
+# only use positive numbers here
+# set it to the size of the dataset
+max_samples: 100
+overwrite_cache: true
+preprocessing_num_workers: 16
+
+### output
+output_dir: output_models/qwen2.5-0.5b-genrm_dpo
+logging_steps: 1
+save_steps: 3
+plot_loss: true
+overwrite_output_dir: true
+save_only_model: true
+
+### train
+per_device_train_batch_size: 2
+#stores these gradients instead of immediately updating after every batch
+#best to keep the same or increase
+gradient_accumulation_steps: 8
+learning_rate: 5.0e-6
+num_train_epochs: 2.0
+lr_scheduler_type: cosine
+warmup_ratio: 0.1
+bf16: true
+ddp_timeout: 180000000
