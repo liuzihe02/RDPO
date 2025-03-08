@@ -31,12 +31,29 @@ If the last step doesn't work, try doing `pip install -r requirements.txt --no-b
 We use the [GenRM](https://huggingface.co/datasets/flowingpurplecrane/genrm) dataset to run some initial experiments:
 
 1. DPO w/o verification
+   - For each question, select one correct answer and one incorrect answer. Do DPO on these questions.
 2. SFT w/o verification
    - We only use the correct answers
 3. SFT w/ verification
-   - We only use the correct answers
+   - We only use the correct answers, but this time we also concatenate it with rationale for why its correct
 
 We use a subset of `num_samples`, where we select a pair of correct and incorrect answer for each sample.
+
+## Setup
+
+This assumes you have already downloaded `LLaMA-Factory` in the `train/` directory
+
+1. Download and Process Data
+   - I have uploaded the GenRM dataset to huggingface
+   - Simply navigate to `tools/scripts/evaluate.sh` and run this bash script
+   - This will download the all the data, do some processing, and save it to `train/LLaMA-Factory/data`
+   - Edit the `dataset_info.json` file to reflect the data structure (I should have already done this)
+2. Train
+   - Edit the corresponding `yaml` files in `train/scripts` to use `LLaMA-Factory` for training
+   - Once done, run the corresponding bash script like `train/scripts/train-qwen2.5-0.5b-genrm-dpo/train.sh`
+3. Eval
+   - We modify the Qwen eval scripts to evaluate our checkpoints on the MATH-500 dataset
+   - Run `train/validation/rdpo_validate.sh` and modify where the checkpoints are stored accordingly
 
 ---
 
