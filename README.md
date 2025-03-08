@@ -1,11 +1,17 @@
 # Reasoning DPO
 
 - This is a fork of the Critique Fine Tuning repo, made for initial experimentation
-- As reccomended with LlamaFactory, we use `uv` for package management, use the reccomended versions from their github page
+
+## Installing Packages
 ```bash
-#make a uv venv and run the following
-uv pip install -r requirements.txt --no-build-isolation
+#somehow we need to install these packages manually
+pip install packaging wheel torch==2.4.0
+#we use no build isolation so it can access the dependencies in our venv
+pip install -r requirements.txt --no-build-isolation
 ```
+
+If the last step doesn't work, try doing `pip install -r requirements.txt --no-build-isolation`. Afterwards, follow the `LLaMA-Factory` [instructions](https://github.com/hiyouga/LLaMA-Factory) to download that.
+
 - need to modify the `data/datasets_info.json` in `LLaMa-Factory` **anytime you add new data**
   - Because we use our own copy of LlamaFactory, we may run into some issues
 
