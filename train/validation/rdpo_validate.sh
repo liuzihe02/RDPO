@@ -5,7 +5,7 @@ export CUDA_VISIBLE_DEVICES=0,1,2,3
 
 #this directory contains many subdirectories. Each subdirectory is a checkpoint directory
 #model_dir="../LLaMA-Factory/output_models/qwen2.5-0.5b-genrm_dpo-2000"
-model_dir="/home/flowingpurplecrane/RDPO/train/LLaMA-Factory/output_models/qwen2.5-0.5b-genrm-sft-no_veri"
+model_dir="/home/flowingpurplecrane/RDPO/train/LLaMA-Factory/output_models/qwen2.5-0.5b-genrm_dpo-2000"
 #we will create a results directory here.
 output_dir="/home/flowingpurplecrane/RDPO/train/validation"
 #number of samples to use for validation

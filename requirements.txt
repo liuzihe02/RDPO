@@ -15,7 +15,6 @@ vllm>=0.4.3 #i have adjusted this to be flexible accomodate for deepspeed
 tqdm
 datasets
 python_dateutil
-flash_attn
 
 # math_eval
 # sympy==1.12 # old version of sympy that was incompatible

@@ -28,3 +28,4 @@ train/LLaMA-Factory
 #ignore the backup folder
 .git_backup
 .git_backup/
+clean/

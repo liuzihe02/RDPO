@@ -1,6 +1,6 @@
 # Reasoning DPO
 
-- This is a fork of the Critique Fine Tuning repo, made for initial experimentation
+This is a fork of the Critique Fine Tuning repo, made for initial experimentation
 
 ## Installing Packages
 ```bash
@@ -10,15 +10,14 @@ pip install packaging wheel torch==2.4.0
 pip install -r requirements.txt --no-build-isolation
 ```
 
-If the last step doesn't work, try doing `pip install -r requirements.txt --no-build-isolation`. Afterwards, follow the `LLaMA-Factory` [instructions](https://github.com/hiyouga/LLaMA-Factory) to download that.
-
-- need to modify the `data/datasets_info.json` in `LLaMa-Factory` **anytime you add new data**
-  - Because we use our own copy of LlamaFactory, we may run into some issues
+If the last step doesn't work, try doing `pip install -r requirements.txt --no-build-isolation`. Afterwards, follow the `LLaMA-Factory` [instructions](https://github.com/hiyouga/LLaMA-Factory) to download `LLaMA-Factory` manually.
 
 ## Notes
 
 - `LlamaFactory` is stored in the `train/` subdirectory, install it in the train subdir before running anything
   - Data is stored in the LlamaFactory folder
+- need to modify the `data/datasets_info.json` in `LLaMa-Factory` **anytime you add new data**
+  - Because we use our own copy of LlamaFactory, we may run into some issues
 - `cutoff_len` and `per_device_train_batch_size` are by far largest factors controlling memory usage
   - Play around with this to just nice fit on device
 - Deepspeed3 doesnt work with bitsandbytes for some reason
@@ -50,10 +49,11 @@ This assumes you have already downloaded `LLaMA-Factory` in the `train/` directo
    - Edit the `dataset_info.json` file to reflect the data structure (I should have already done this)
 2. Train
    - Edit the corresponding `yaml` files in `train/scripts` to use `LLaMA-Factory` for training
-   - Once done, run the corresponding bash script like `train/scripts/train-qwen2.5-0.5b-genrm-dpo/train.sh`
+   - Once done, navigate to the corresponding folder like `train/scripts/train-qwen2.5-0.5b-genrm-dpo` and run the corresponding bash script like `train/scripts/train-qwen2.5-0.5b-genrm-dpo/train.sh`
 3. Eval
    - We modify the Qwen eval scripts to evaluate our checkpoints on the MATH-500 dataset
    - Run `train/validation/rdpo_validate.sh` and modify where the checkpoints are stored accordingly
+   - If you face issues with `latex2sympy`, this is probably due to `antlr`. Uninstall `latex2sympy` and reinstall it again; it should use the correct version of `antlr` now.
 
 ---
 
