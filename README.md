@@ -16,6 +16,7 @@ If the last step doesn't work, try doing `pip install -r requirements.txt --no-b
 
 - `LlamaFactory` is stored in the `train/` subdirectory, install it in the train subdir before running anything
   - Data is stored in the LlamaFactory folder
+  - Since we modify this for RDPO, we need to upload the entire package
 - need to modify the `data/datasets_info.json` in `LLaMa-Factory` **anytime you add new data**
   - Because we use our own copy of LlamaFactory, we may run into some issues
 - `cutoff_len` and `per_device_train_batch_size` are by far largest factors controlling memory usage

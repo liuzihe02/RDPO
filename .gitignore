@@ -9,10 +9,6 @@ local*
 venv/
 .venv/
 
-#ignore the llama factory stuff
-# Ignore any folder that begins with llamafactory
-train/LLaMA-Factory
-
 #ignore cache
 *.pyc
 
