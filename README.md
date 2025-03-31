@@ -56,6 +56,53 @@ This assumes you have already downloaded `LLaMA-Factory` in the `train/` directo
    - Run `train/validation/rdpo_validate.sh` and modify where the checkpoints are stored accordingly
    - If you face issues with `latex2sympy`, this is probably due to `antlr`. Uninstall `latex2sympy` and reinstall it again; it should use the correct version of `antlr` now.
 
+## Modifying RDPO
+
+### Modifying Data
+
+Originally in DPO, we had:
+
+```
+"prompt": Solve the question
+"chosen": Step 1 Step 2... The answer is 12
+"rejected": Step 1 Step 2... The answer is 15
+"reasoning": the first answer is better because...
+```
+
+So we need to modify how `trl` and llamafactory handles the data
+
+The main function that processes string inputs into batches of tensors is the `tokenize_row` method in the `DPOTrainer` class from TRL (in the `trl DPO trainer.py` file). This method handles the transformation of individual examples from the dataset into tokenized inputs for the model.
+
+Let's look at the key components:
+
+1. In the TRL `DPOTrainer` class, the `tokenize_row` method (around line 490) handles:
+   - Converting raw text prompts and responses to tokens
+   - Managing truncation logic
+   - Preparing labels for training
+
+2. In LlamaFactory's CustomDPOTrainer implementation (in `dpo/trainer.py`), they inherit this functionality from TRL's DPOTrainer, but customize other aspects of the training process.
+
+3. The actual batch creation happens through a data collator, which is typically `DPODataCollatorWithPadding` in TRL or `PairwiseDataCollatorWithPadding` in LlamaFactory.
+
+If you want to modify how a "reasoning" column is processed differently from "chosen" and "rejected", you would need to:
+
+1. Modify the `tokenize_row` method to handle the additional "reasoning" column
+2. Update the data collator to properly batch the processed reasoning data
+
+The critical path is:
+```
+Raw dataset → tokenize_row → data collator → model inputs
+```
+
+For LlamaFactory specifically, you should look at:
+1. `dpo/workflow.py` - Where the dataset is loaded and processed
+2. `data.py` - Where data collation happens
+3. `dpo/trainer.py` - Where the CustomDPOTrainer inherits from TRL's DPOTrainer
+
+I'd suggest modifying the `tokenize_row` method in a subclass of TRL's DPOTrainer or LlamaFactory's CustomDPOTrainer to handle your "reasoning" column differently.
+
+
+
 ---
 
 # CritiqueFineTuning
