@@ -29,7 +29,56 @@ If the last step doesn't work, try doing `pip install -r requirements.txt --no-b
 
 ## Data and RDPO
 
+Structure of RDPO data:
 
+```python
+"""
+for the genrm_rdpo:
+
+"question": concatenate the first part of "inputs" "Solve ... with \"The answer is [Insert Final Answer Here]\"." with the "problem" column
+"chosen": The "answer" column of the correct response
+"rejected": The "answer" column of the incorrect response
+"reasoning": the "target" column of the correct response concatenated with the "target" column of incorrect response
+
+save it as data_genrm_rdpo.json
+"""
+def create_rdpo_dataset(master_df):
+    """Create the RDPO dataset which is similar to DPO but includes the verification data.
+    For each question, the 'chosen' and 'rejected' fields are built by concatenating
+    the answer with the verification rationale."""
+    print("Creating RDPO dataset...")
+
+    rdpo_data = []
+    unique_questions = master_df["question_id"].unique()
+
+    # for each question
+    for qid in tqdm(unique_questions, desc="Creating RDPO entries"):
+        question_rows = master_df[master_df["question_id"] == qid]
+        assert len(question_rows) == 2
+        correct_row = question_rows[question_rows["correct"] == "Yes"].iloc[0]
+        incorrect_row = question_rows[question_rows["correct"] == "No"].iloc[0]
+
+        print(correct_row)
+        print(incorrect_row)
+
+        rdpo_entry = {
+            "question": """Solve the math problems and provide step-by-step solutions, ending with \"The answer is [Insert Final Answer Here]\"."""
+            + correct_row["problem"],
+            "chosen": correct_row["answer"],
+            "rejected": incorrect_row["answer"],
+            "reasoning": "This is a correct solution and preferred: "
+            + correct_row["answer"]
+            + " Here's why this solution is correct and preferred: "
+            + correct_row["targets"]
+            + ". This is an incorrect solution and not preferred: "
+            + incorrect_row["answer"]
+            + " Here's why this solution is incorrect and not preferred: "
+            + incorrect_row["targets"],
+        }
+        rdpo_data.append(rdpo_entry)
+
+    return rdpo_data
+```
 
 ## Experiments
 

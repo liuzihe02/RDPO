@@ -255,6 +255,7 @@ def create_rdpo_dataset(master_df):
     # for each question
     for qid in tqdm(unique_questions, desc="Creating RDPO entries"):
         question_rows = master_df[master_df["question_id"] == qid]
+        assert len(question_rows) == 2
         correct_row = question_rows[question_rows["correct"] == "Yes"].iloc[0]
         incorrect_row = question_rows[question_rows["correct"] == "No"].iloc[0]
 
@@ -266,14 +267,14 @@ def create_rdpo_dataset(master_df):
             + correct_row["problem"],
             "chosen": correct_row["answer"],
             "rejected": incorrect_row["answer"],
-            "reasoning": " This is a correct solution and preferred:"
+            "reasoning": "This is a correct solution and preferred: "
             + correct_row["answer"]
             + " Here's why this solution is correct and preferred: "
-            + correct_row["target"]
-            + " This is an incorrect solution and not preferred:"
+            + correct_row["targets"]
+            + ". This is an incorrect solution and not preferred: "
             + incorrect_row["answer"]
             + " Here's why this solution is incorrect and not preferred: "
-            + incorrect_row["target"],
+            + incorrect_row["targets"],
         }
         rdpo_data.append(rdpo_entry)
 
@@ -377,7 +378,7 @@ def main():
     # note the number of samples here will be doubled, because each question has one correct and one incorrect answer
     master_filename = "data-genrm-master.json"
     # # optional to save the master dataset as we dont actually use this dataset for direct training
-    # save_dataset(master_data, master_filename, args.output)
+    save_dataset(master_data, master_filename, args.output)
 
     # Create and save the DPO dataset
     dpo_data = create_dpo_dataset(master_df)
