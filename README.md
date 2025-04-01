@@ -112,16 +112,25 @@ This assumes you have already downloaded `LLaMA-Factory` in the `train/` directo
 
 ## Modifying RDPO
 
-Core files we'll have to mess around with and understand whats going on:
+Core files we mess around with and understand whats going on:
 
 For DPO
 - TRL: `trainer/dpo_trainer.py`
   - Although the `CustomDPOTrainer` subclasses the trl `DPOTrainer`, the `tokenize_row` function of `DPOTrainer` is never actually used! The `super().__init__` actually uses the trl generic `Trainer` class instead
-- llamafactory: `data/loader.py`, `data/processor/pairwise.py`, `train/dpo/trainer.py`, maybe `data/collator.py`?
-  - Note that although stage for dpo is `dpo`, backend it actually uses `rm` and hence the `PairwiseDatasetProcessor`
+- llamafactory:
+  - `data/converter.py`
+    - convert into the correct `example` row containing `_prompt` and `_response`
+    - used our own `class RDPODatasetConverter(DatasetConverter):` for this
+  - `data/loader.py`
+    - add option for `rdpo_pairwise.py`
+  - `data/processor/rdpo_pairwise.py`
+    - implement preprocessing function to convert `example` into chosen,rejected,reasoning token ids via `RDPOPairwiseDatasetProcessor`
+  - `data/collator.py`?
+  - `train/rdpo/trainer.py`
+  - `train/rdpo/workflow.py`
 - transformers: `trainer.py`
 
-Originally in DPO, we had:
+RDPO json data
 
 ```
 "prompt": Solve the question
@@ -203,6 +212,14 @@ def get_dataset(template, model_args, data_args, training_args, stage, tokenizer
       # logger.info_rank0(f"zihe logger after process {dataset_module['train_dataset']}")
 
       return dataset_module
+
+---
+llamafactory/data/loader.py -> _get_merged_dataset
+llamafactory/data/loader.py -> _load_single_dataset
+llamafactory/data/converter.py -> align_dataset
+
+here, we specify the RDPO data format
+RDPODatasetConverter(DatasetConverter):
    
 
 ---
@@ -257,9 +274,9 @@ this calls the trl self.dpo_loss
 
 ### 1. Add RDPO DatasetConverter
 
-Add a new dataset format to `llamafactory/data/converter.py` as `RDPODatasetConverter` that extends either Alpaca
+Add a new dataset format to `llamafactory/data/converter.py` as `RDPODatasetConverter` that extends Alpaca to include the reasoning data in the `_response` field
 
-The `DatasetConverter` will change the json file into prompt and responses
+`DatasetConverter` will changes the json file into prompt and responses, ready to be used for preprocessing. This is determined by `DatasetAttr`
 
 > remember to specify `formatting: "rdpo"` in the `dataset_info.json` file for a custom formatting
 
@@ -276,6 +293,20 @@ this is located in `data/processor/rdpo_pairwise.py` to include `RDPOPairwiseDat
   - we include `data_args._rdpo_data` in `data_args` too, and this is only updated in `run_rdpo` to True, otherwise its default `False`
 
 Make sure to edit the training yaml file to include `genrm_rdpo` as the dataset too
+
+Note there is a difference between `data_args` of type `DataArguments` which is provided in training yaml config file, and `dataset_attr` of type `DatasetAttr` which is specified in `dataset_info.json`
+
+Note that `input_ids` include the prompt and chosen/rejected/reasoning etc and `labels` only include the chosen/rejected/reasoning etc
+
+Note that although stage for dpo is `dpo`, backend it actually uses `rm` and hence the `PairwiseDatasetProcessor`
+
+### 3. Create a new file: `data/collator/rdpo_collator.py`
+
+### 4. Create a new file: `train/rdpo/trainer.py`
+
+### 5. Create a new file: `train/rdpo/workflow.py`
+
+### 6. Modify `hparams/finetuning_args.py` to include new hparams
 
 ---
 

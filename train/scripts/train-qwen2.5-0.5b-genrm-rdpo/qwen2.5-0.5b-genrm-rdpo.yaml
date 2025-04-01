@@ -32,7 +32,7 @@ dataset: genrm_rdpo
 # though i think this is just to format the dataset questions?
 template: qwen
 #this can significantly affect cuda memory use
-cutoff_len: 450
+cutoff_len: 1400
 #subset of entire training set, for experimentation
 # only use positive numbers here
 # set it to the size of the dataset

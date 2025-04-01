@@ -259,25 +259,23 @@ def create_rdpo_dataset(master_df):
         correct_row = question_rows[question_rows["correct"] == "Yes"].iloc[0]
         incorrect_row = question_rows[question_rows["correct"] == "No"].iloc[0]
 
-        print(correct_row)
-        print(incorrect_row)
-
         rdpo_entry = {
             "question": """Solve the math problems and provide step-by-step solutions, ending with \"The answer is [Insert Final Answer Here]\"."""
             + correct_row["problem"],
             "chosen": correct_row["answer"],
             "rejected": incorrect_row["answer"],
-            "reasoning": "This is a correct solution and preferred: "
+            "reasoning": "\nThis is a correct solution and preferred: "
             + correct_row["answer"]
-            + " Here's why this solution is correct and preferred: "
+            + " \n\nHere's why this solution is correct and preferred: "
             + correct_row["targets"]
-            + ". This is an incorrect solution and not preferred: "
+            + "\n\nThis is an incorrect solution and not preferred: "
             + incorrect_row["answer"]
-            + " Here's why this solution is incorrect and not preferred: "
+            + "\n\nHere's why this solution is incorrect and not preferred: "
             + incorrect_row["targets"],
         }
         rdpo_data.append(rdpo_entry)
 
+    print(f"Created {len(rdpo_data)} RDPO entries")
     return rdpo_data
 
 
@@ -402,15 +400,6 @@ def main():
 
     # Print summary
     print("\nDataset processing complete!")
-    print(
-        f"- Created master dataset with {len(master_df['question_id'].unique())} unique questions"
-    )
-    print(f"- Created DPO dataset with {len(dpo_data)} examples")
-    print(
-        f"- Created SFT without verification dataset with {len(sft_no_veri_data)} examples"
-    )
-    print(f"- Created SFT with verification dataset with {len(sft_veri_data)} examples")
-    print(f"\nAll files saved to: {args.output}")
 
 
 if __name__ == "__main__":

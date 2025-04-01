@@ -222,6 +222,7 @@ def _get_dataset_processor(
         else:
             dataset_processor_class = SupervisedDatasetProcessor
 
+    # note that dpo uses the dataset processor for rm
     elif stage == "rm":
         # rdpo
         if data_args._rdpo_data:
@@ -280,7 +281,10 @@ def _get_preprocessed_dataset(
     # zihe needs to check how dataset is also structured here
     logger.info_rank0(f"zihe after mapping preprocess{dataset}")
 
-    if training_args.should_log:
+    # zihe temporary check, you can make this permanently true to inspect the data
+    # if training_args.should_log:
+
+    if True:
         try:
             print("eval example:" if is_eval else "training example:")
             dataset_processor.print_data_example(next(iter(dataset)))
