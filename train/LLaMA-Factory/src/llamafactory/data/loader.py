@@ -32,6 +32,7 @@ from .processor import (
     PretrainDatasetProcessor,
     SupervisedDatasetProcessor,
     UnsupervisedDatasetProcessor,
+    RDPOPairwiseDatasetProcessor,
 )
 
 
@@ -139,6 +140,8 @@ def _load_single_dataset(
             trust_remote_code=model_args.trust_remote_code,
         )
 
+    logger.info_rank0(f"zihe dataset load single {dataset[0]}")
+
     if dataset_attr.num_samples is not None and not data_args.streaming:
         target_num = dataset_attr.num_samples
         indexes = np.random.permutation(len(dataset))[:target_num]  # all samples should be included
@@ -178,6 +181,8 @@ def _get_merged_dataset(
             raise ValueError("The dataset is not applicable in the current training stage.")
 
         datasets[dataset_name] = _load_single_dataset(dataset_attr, model_args, data_args, training_args)
+        # check if message is formatted correctly
+        logger.info_rank0(f"zihe reasoning {datasets[dataset_name][0]}")
 
     if merge:
         return merge_dataset(list(datasets.values()), data_args, seed=training_args.seed)
@@ -218,7 +223,12 @@ def _get_dataset_processor(
             dataset_processor_class = SupervisedDatasetProcessor
 
     elif stage == "rm":
-        dataset_processor_class = PairwiseDatasetProcessor
+        # rdpo
+        if data_args._rdpo_data:
+            dataset_processor_class = RDPOPairwiseDatasetProcessor
+        # vanilla dpo
+        else:
+            dataset_processor_class = PairwiseDatasetProcessor
     elif stage == "kto":
         dataset_processor_class = FeedbackDatasetProcessor
     else:
@@ -255,6 +265,10 @@ def _get_preprocessed_dataset(
             desc="Running tokenizer on dataset",
         )
 
+    # zihe need to check how dataset is structured here
+    logger.info_rank0(f"zihe before mapping preprocess{dataset}")
+
+    # this will use our DatasetConverters and RDPOPairwiseDatasetProcessor
     dataset = dataset.map(
         dataset_processor.preprocess_dataset,
         batched=True,
@@ -262,6 +276,9 @@ def _get_preprocessed_dataset(
         remove_columns=column_names,
         **kwargs,
     )
+
+    # zihe needs to check how dataset is also structured here
+    logger.info_rank0(f"zihe after mapping preprocess{dataset}")
 
     if training_args.should_log:
         try:
@@ -324,7 +341,7 @@ def get_dataset(
     [INFO|2025-03-31 18:15:20] llamafactory.data.loader:157 >> zihe logger after loading {'_prompt': [{'content': 'Solve the math problems and provide step-by-step solutions, ending with "The answer is [Insert Final Answer Here]".Q: Susan walked to the market to buy five dozen peaches.  To carry them home, she brought two identically-sized cloth bags and a much smaller knapsack.  Into the knapsack she placed half as many peaches as she placed in each of the two cloth bags. How many peaches did she put in the knapsack?', 'role': 'user'}], '_response': [{'content': "Let's think step by step.\nSusan bought five dozen peaches, which means 5 * 12 = 60 peaches. She put half as many peaches into the knapsack as she put into each cloth bag. Let's say she put x peaches into each cloth bag. So, she put x / 2 peaches into the knapsack. Since she put the same number of peaches into each cloth bag, she put two times x peaches into the cloth bags, which is 2x. Therefore, we have x + x + x / 2 = 60. Simplifying this equation, we get 2.5x = 60. Dividing both sides by 2.5, we find x = 24. So, she put x / 2 = 24 / 2 = 12 peaches into the knapsack. The answer is 12.", 'role': 'assistant'}, {'content': "Let's think step by step.\n5 dozen = 5 * 12 = 60. Susan has 2 cloth bags so she placed 60 / 2 = 30 peaches in each bag and since the knapsack is half of this amount, she placed 30 / 2 = 15 peaches in the knapsack. The answer is 15.", 'role': 'assistant'}], '_system': '', '_tools': '', '_images': None, '_videos': None, '_audios': None}
     """
     # use logger to inspect dataset. view the first row
-    # logger.info_rank0(f"zihe logger after loading {dataset[0]}")
+    logger.info_rank0(f"zihe logger after loading {dataset[0]}")
 
     with training_args.main_process_first(desc="pre-process dataset"):
         dataset = _get_preprocessed_dataset(

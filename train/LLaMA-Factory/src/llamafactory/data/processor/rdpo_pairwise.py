@@ -15,11 +15,24 @@
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
 
+from llamafactory.data.mm_plugin import VideoInput
+
 from ...extras import logging
 from ...extras.constants import IGNORE_INDEX
 from .processor_utils import DatasetProcessor, infer_seqlen
 from .pairwise import PairwiseDatasetProcessor
 from typing_extensions import override
+
+from collections import defaultdict
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
+
+from ...extras import logging
+from ...extras.constants import IGNORE_INDEX
+from .processor_utils import DatasetProcessor, infer_seqlen
+
+
+if TYPE_CHECKING:
+    from ..mm_plugin import AudioInput, ImageInput, VideoInput
 
 
 if TYPE_CHECKING:
@@ -53,18 +66,9 @@ class RDPOPairwiseDatasetProcessor(PairwiseDatasetProcessor):
                 audios=examples["_audios"][i] or [],
             )
 
-            # Add rationale processing
-            rationale = examples.get("_reasoning", [None])[i]
-            if rationale:
-                rationale_ids = self.tokenizer.encode(rationale, add_special_tokens=False)
-                if len(rationale_ids) > 0:
-                    # Truncate if needed
-                    rationale_ids = rationale_ids[: min(len(rationale_ids), 512)]
-                    model_inputs["rationale_ids"].append(rationale_ids)
-                else:
-                    model_inputs["rationale_ids"].append([])
-            else:
-                model_inputs["rationale_ids"].append([])
+            # check how long is response and prompt
+            print(f" zihe prompt is {examples['_prompt'][i]}")
+            print(f" zihe response is {examples['_response'][i]}")
 
             model_inputs["chosen_input_ids"].append(chosen_input_ids)
             model_inputs["chosen_attention_mask"].append([1] * len(chosen_input_ids))
@@ -78,20 +82,15 @@ class RDPOPairwiseDatasetProcessor(PairwiseDatasetProcessor):
 
         return model_inputs
 
-    def print_data_example(self, example: Dict[str, List[int]]) -> None:
-        valid_chosen_labels = list(filter(lambda x: x != IGNORE_INDEX, example["chosen_labels"]))
-        valid_rejected_labels = list(filter(lambda x: x != IGNORE_INDEX, example["rejected_labels"]))
-        print("chosen_input_ids:\n{}".format(example["chosen_input_ids"]))
-        print(
-            "chosen_inputs:\n{}".format(self.tokenizer.decode(example["chosen_input_ids"], skip_special_tokens=False))
-        )
-        print("chosen_label_ids:\n{}".format(example["chosen_labels"]))
-        print(f"chosen_labels:\n{self.tokenizer.decode(valid_chosen_labels, skip_special_tokens=False)}")
-        print("rejected_input_ids:\n{}".format(example["rejected_input_ids"]))
-        print(
-            "rejected_inputs:\n{}".format(
-                self.tokenizer.decode(example["rejected_input_ids"], skip_special_tokens=False)
-            )
-        )
-        print("rejected_label_ids:\n{}".format(example["rejected_labels"]))
-        print(f"rejected_labels:\n{self.tokenizer.decode(valid_rejected_labels, skip_special_tokens=False)}")
+    @override
+    def _encode_data_example(
+        self,
+        prompt: Sequence[Dict[str, str]],
+        response: Sequence[Dict[str, str]],
+        system: str | None,
+        tools: str | None,
+        images: Sequence[str | bytes | EncodedImage | Image],
+        videos: Sequence[str],
+        audios: Sequence[str | ndarray[Any, dtype]],
+    ) -> Tuple[List[int]]:
+        return super()._encode_data_example(prompt, response, system, tools, images, videos, audios)

@@ -210,9 +210,32 @@ class SharegptDatasetConverter(DatasetConverter):
         return output
 
 
+@dataclass
+class RDPODatasetConverter(DatasetConverter):
+    """
+    Converter for RDPO (Reasoning-based DPO) datasets.
+    This extends either AlpacaDatasetConverter to include reasoning information.
+    """
+
+    def __call__(self, example: Dict[str, Any]) -> Dict[str, Any]:
+        # just use default Alpaca converter as base
+        base_converter = AlpacaDatasetConverter(self.dataset_attr, self.data_args)
+        # First get the standard conversion
+        output = base_converter(example)
+
+        # Update the chosen response with reasoning incorporated
+        # simply add it to the _response field
+        output["_response"].append(
+            {"role": "assistant", "content": example["reasoning"]},
+        )
+
+        return output
+
+
 DATASET_CONVERTERS = {
     "alpaca": AlpacaDatasetConverter,
     "sharegpt": SharegptDatasetConverter,
+    "rdpo": RDPODatasetConverter,
 }
 
 
@@ -242,6 +265,8 @@ def align_dataset(
     data_args: "DataArguments",
     training_args: "Seq2SeqTrainingArguments",
 ) -> Union["Dataset", "IterableDataset"]:
+    # we modify this; the _response will include the reasoning data too
+    # so chosen, rejected, then reasoning
     r"""
     Aligned dataset:
         _prompt: [{"role": "user", "content": "..."}] * (2T - 1)

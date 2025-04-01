@@ -5,6 +5,9 @@ from .processor_utils import DatasetProcessor
 from .supervised import PackedSupervisedDatasetProcessor, SupervisedDatasetProcessor
 from .unsupervised import UnsupervisedDatasetProcessor
 
+# zihe update list of processors
+from .rdpo_pairwise import RDPOPairwiseDatasetProcessor
+
 
 __all__ = [
     "DatasetProcessor",
@@ -14,4 +17,5 @@ __all__ = [
     "PackedSupervisedDatasetProcessor",
     "SupervisedDatasetProcessor",
     "UnsupervisedDatasetProcessor",
+    "RDPOPairwiseDatasetProcessor",
 ]

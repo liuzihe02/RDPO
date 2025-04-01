@@ -40,6 +40,10 @@ def run_rdpo(
     tokenizer = tokenizer_module["tokenizer"]
     template = get_template_and_fix_tokenizer(tokenizer, data_args)
     # DPO USES RM AS THE STAGE
+
+    # hacky way to include data_args flag for rdpo only
+    data_args._rdpo_data = True
+
     dataset_module = get_dataset(template, model_args, data_args, training_args, stage="rm", **tokenizer_module)
     model = load_model(tokenizer, model_args, finetuning_args, training_args.do_train)
 

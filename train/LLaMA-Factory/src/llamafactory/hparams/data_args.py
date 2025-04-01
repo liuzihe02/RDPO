@@ -124,6 +124,15 @@ class DataArguments:
         },
     )
 
+    # zihe rdpo indicator to mimic finetuning args
+    # this should NOT be provided in the yaml file
+    _rdpo_data: bool = field(
+        default=False,
+        metadata={
+            "help": "super hacky way to copy the rdpo flag from fine_tuning args, so that it is also available in data_args"
+        },
+    )
+
     def __post_init__(self):
         def split_arg(arg):
             if isinstance(arg, str):

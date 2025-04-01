@@ -255,9 +255,27 @@ this calls the trl self.dpo_loss
 [combine with other losses, collect metrics, etc.]
 ```
 
-### 1. Create RDPO Preprocessor
+### 1. Add RDPO DatasetConverter
 
-this is located in `data/processor/rdpo_pairwise.py`
+Add a new dataset format to `llamafactory/data/converter.py` as `RDPODatasetConverter` that extends either Alpaca
+
+The `DatasetConverter` will change the json file into prompt and responses
+
+> remember to specify `formatting: "rdpo"` in the `dataset_info.json` file for a custom formatting
+
+### 2. Create RDPO Preprocessor
+
+this is located in `data/processor/rdpo_pairwise.py` to include `RDPOPairwiseDatasetProcessor`
+- update `__init__.py` to accept `RDPOPairwiseDatasetProcessor`
+
+- update `loader.py` in a super hacky way to accept `RDPOPairwiseDatasetProcessor` as another processor
+  - this file is extensively modified
+  - because `get_dataset` in `loader.py` ultimately calls `_get_dataset_processor` which decides `PairwiseDatasetProcessor` or `RDPOPairwiseDatasetProcessor`
+  - However the `finetuning_args` is not passed in, only `data_args` are passed in
+  - so the flag for whether `rdpo` activates has to be through `data_args`
+  - we include `data_args._rdpo_data` in `data_args` too, and this is only updated in `run_rdpo` to True, otherwise its default `False`
+
+Make sure to edit the training yaml file to include `genrm_rdpo` as the dataset too
 
 ---
 

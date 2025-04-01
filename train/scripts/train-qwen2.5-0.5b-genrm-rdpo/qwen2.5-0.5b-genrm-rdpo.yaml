@@ -8,6 +8,7 @@ trust_remote_code: true
 ### method
 
 #what kind of training
+# still provide dpo here even if you use rdpo
 stage: dpo
 #if you use dpo, need to specify if RDPO or not!
 rdpo: true
@@ -25,8 +26,10 @@ pref_loss: sigmoid # choices: [sigmoid (dpo), orpo, simpo]
 ### dataset
 
 #must exist locally, in the LlamaFactory dataset folder
-dataset: genrm_dpo
+#remember to use the RDPO dataset format
+dataset: genrm_rdpo
 #Dataset template, please ensure that the dataset template corresponds to the model.
+# though i think this is just to format the dataset questions?
 template: qwen
 #this can significantly affect cuda memory use
 cutoff_len: 450

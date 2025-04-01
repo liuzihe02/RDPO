@@ -16,7 +16,7 @@ should probably proofread and complete it, then remove this comment. -->
 
 # qwen2.5-0.5b-genrm_rdpo
 
-This model is a fine-tuned version of [Qwen/Qwen2.5-0.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct) on the genrm_dpo dataset.
+This model is a fine-tuned version of [Qwen/Qwen2.5-0.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct) on the genrm_rdpo dataset.
 
 ## Model description
 
