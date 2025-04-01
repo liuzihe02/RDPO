@@ -442,6 +442,13 @@ class FinetuningArguments(
         metadata={"help": "Whether or not to compute effective tokens per second."},
     )
 
+    # zihe: extra argument for rdpo
+    rdpo: bool = field(
+        # default always false
+        default=False,
+        metadata={"help": "if you use dpo, need to specify if you want rdpo for veri reasoning"},
+    )
+
     def __post_init__(self):
         def split_arg(arg):
             if isinstance(arg, str):

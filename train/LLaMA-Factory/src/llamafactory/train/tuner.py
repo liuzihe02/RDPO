@@ -33,6 +33,7 @@ from .ppo import run_ppo
 from .pt import run_pt
 from .rm import run_rm
 from .sft import run_sft
+from .rdpo import run_rdpo
 from .trainer_utils import get_ray_trainer, get_swanlab_callback
 
 
@@ -70,7 +71,12 @@ def _training_function(config: Dict[str, Any]) -> None:
     elif finetuning_args.stage == "ppo":
         run_ppo(model_args, data_args, training_args, finetuning_args, generating_args, callbacks)
     elif finetuning_args.stage == "dpo":
-        run_dpo(model_args, data_args, training_args, finetuning_args, callbacks)
+        # zihe: if dpo, check if rdpo is true or not
+        if finetuning_args.rdpo:
+            run_rdpo(model_args, data_args, training_args, finetuning_args, callbacks)
+        # run vanilla dpo
+        else:
+            run_dpo(model_args, data_args, training_args, finetuning_args, callbacks)
     elif finetuning_args.stage == "kto":
         run_kto(model_args, data_args, training_args, finetuning_args, callbacks)
     else:
