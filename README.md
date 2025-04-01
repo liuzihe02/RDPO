@@ -27,6 +27,10 @@ If the last step doesn't work, try doing `pip install -r requirements.txt --no-b
   - If size of training dataset too big, also memory issues
 - For debugging, use `logger.info_rank0(f"zihe logger after process {dataset_module['train_dataset']}")` instead of print. the `logger` object should already have been defined
 
+## Data and RDPO
+
+
+
 ## Experiments
 
 We use the [GenRM](https://huggingface.co/datasets/flowingpurplecrane/genrm) dataset to run some initial experiments:

@@ -72,8 +72,10 @@ Data processing for all files
 # from all the unique questions, sample a subset of unique questions
 # for each question, select a correct output and an incorrect output
 # double check for each question there is EXACTLY ONE correct and one incorrect output, and that all questions are unique
+#so the first row is question 1 correct answer
+#second row is question 1 incorrect answer
 
-Save this master dataset as data_genrm_master_{sample size}.json
+Save this master dataset as data_genrm_master.json
 """
 
 
@@ -108,15 +110,27 @@ def process_master_dataset(dataset, num_samples):
             "model_output_id",
             "inputs",
             "instruction",
+            # the math problem
             "problem",
+            # the output answer
             "answer",
-            # target is the expected answer here
+            # target is the expected answer here. a single number as a string
             "target",
+            # Yes or no wheher or not correct
             "correct",
             # targets is the verification rationale here
             "targets",
         ]
     ]
+
+    # Count rows where "targets" is null
+    num_null = df["targets"].isnull().sum()
+    # Count rows where "target" is an empty string (after stripping whitespace)
+    num_empty = (
+        df["targets"].apply(lambda x: isinstance(x, str) and x.strip() == "")
+    ).sum()
+    print(f"Rows with null 'targets': {num_null}")
+    print(f"Rows with empty 'targets': {num_empty}")
 
     # First find all questions that have both correct and incorrect answers
     print("Finding questions with both correct and incorrect answers...")
@@ -135,7 +149,7 @@ def process_master_dataset(dataset, num_samples):
         f"Found {len(eligible_questions)} questions with both correct and incorrect answers"
     )
 
-    # Sample from eligible questions if needed
+    # Sample from eligible questions if needed, up till num samples
     if num_samples and num_samples < len(eligible_questions):
         sampled_questions = random.sample(eligible_questions, num_samples)
         print(
@@ -152,11 +166,11 @@ def process_master_dataset(dataset, num_samples):
     for question_id in tqdm(sampled_questions, desc="Processing questions"):
         question_df = df[df["question_id"] == question_id]
 
-        # Get correct and incorrect answers for this question
+        # Get ALL correct and incorrect answers for this question
         correct_answers = question_df[question_df["correct"] == "Yes"]
         incorrect_answers = question_df[question_df["correct"] == "No"]
 
-        # Take the first correct and first incorrect answer
+        # Take the FIRST correct and FIRST incorrect answer
         filtered_data.append(correct_answers.iloc[0])
         filtered_data.append(incorrect_answers.iloc[0])
 
@@ -201,6 +215,8 @@ def create_dpo_dataset(master_df):
         question_rows = master_df[master_df["question_id"] == qid]
 
         # Extract correct and incorrect rows
+        # just take the first one that you find a correct and first one that you find incorrect
+        # since there can only be one of this per question
         correct_row = question_rows[question_rows["correct"] == "Yes"].iloc[0]
         incorrect_row = question_rows[question_rows["correct"] == "No"].iloc[0]
 
@@ -213,6 +229,55 @@ def create_dpo_dataset(master_df):
         dpo_data.append(dpo_entry)
 
     return dpo_data
+
+
+"""
+for the genrm_rdpo:
+
+"question": concatenate the first part of "inputs" "Solve ... with \"The answer is [Insert Final Answer Here]\"." with the "problem" column
+"chosen": The "answer" column of the correct response
+"rejected": The "answer" column of the incorrect response
+"reasoning": the "target" column of the correct response concatenated with the "target" column of incorrect response
+
+save it as data_genrm_rdpo.json
+"""
+
+
+def create_rdpo_dataset(master_df):
+    """Create the RDPO dataset which is similar to DPO but includes the verification data.
+    For each question, the 'chosen' and 'rejected' fields are built by concatenating
+    the answer with the verification rationale."""
+    print("Creating RDPO dataset...")
+
+    rdpo_data = []
+    unique_questions = master_df["question_id"].unique()
+
+    # for each question
+    for qid in tqdm(unique_questions, desc="Creating RDPO entries"):
+        question_rows = master_df[master_df["question_id"] == qid]
+        correct_row = question_rows[question_rows["correct"] == "Yes"].iloc[0]
+        incorrect_row = question_rows[question_rows["correct"] == "No"].iloc[0]
+
+        print(correct_row)
+        print(incorrect_row)
+
+        rdpo_entry = {
+            "question": """Solve the math problems and provide step-by-step solutions, ending with \"The answer is [Insert Final Answer Here]\"."""
+            + correct_row["problem"],
+            "chosen": correct_row["answer"],
+            "rejected": incorrect_row["answer"],
+            "reasoning": " This is a correct solution and preferred:"
+            + correct_row["answer"]
+            + " Here's why this solution is correct and preferred: "
+            + correct_row["target"]
+            + " This is an incorrect solution and not preferred:"
+            + incorrect_row["answer"]
+            + " Here's why this solution is incorrect and not preferred: "
+            + incorrect_row["target"],
+        }
+        rdpo_data.append(rdpo_entry)
+
+    return rdpo_data
 
 
 """
@@ -310,7 +375,7 @@ def main():
     # Save the master dataset as a JSON file
     master_data = master_df.to_dict(orient="records")
     # note the number of samples here will be doubled, because each question has one correct and one incorrect answer
-    master_filename = f"data-genrm-master-{args.num_samples * 2}.json"
+    master_filename = "data-genrm-master.json"
     # # optional to save the master dataset as we dont actually use this dataset for direct training
     # save_dataset(master_data, master_filename, args.output)
 
@@ -318,6 +383,11 @@ def main():
     dpo_data = create_dpo_dataset(master_df)
     dpo_filename = "data-genrm-dpo.json"
     save_dataset(dpo_data, dpo_filename, args.output)
+
+    # Create and save the RDPO dataset
+    rdpo_data = create_rdpo_dataset(master_df)
+    rdpo_filename = "data-genrm-rdpo.json"
+    save_dataset(rdpo_data, rdpo_filename, args.output)
 
     # Create and save the SFT dataset without verification
     sft_no_veri_data = create_sft_no_veri_dataset(master_df)
