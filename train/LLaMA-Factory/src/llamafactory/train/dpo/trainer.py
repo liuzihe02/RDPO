@@ -81,7 +81,7 @@ class CustomDPOTrainer(DPOTrainer):
         self.label_smoothing = finetuning_args.dpo_label_smoothing
         self.simpo_gamma = finetuning_args.simpo_gamma
 
-        # using generic trainer init func
+        # using generic trainer init func, NOT the DPOTrainer
         Trainer.__init__(self, model=model, **kwargs)
         self.model_accepts_loss_kwargs = False  # overwrite trainer's default behavior
         if not hasattr(self, "accelerator"):
@@ -178,6 +178,7 @@ class CustomDPOTrainer(DPOTrainer):
             chosen_rewards = self.beta * policy_chosen_logps.to(self.accelerator.device).detach()
             rejected_rewards = self.beta * policy_rejected_logps.to(self.accelerator.device).detach()
         else:
+            # standard dpo loss with reference model
             losses, chosen_rewards, rejected_rewards = self.dpo_loss(
                 policy_chosen_logps, policy_rejected_logps, reference_chosen_logps, reference_rejected_logps
             )
@@ -191,6 +192,9 @@ class CustomDPOTrainer(DPOTrainer):
         r"""
         Computes the sum log probabilities of the labels under given logits if loss_type is not IPO, ORPO or SimPO.
 
+
+        this splits up a batch tensor into the relevant stuff
+
         Otherwise the average log probabilities.
         """
         if self.finetuning_args.use_ref_model:
@@ -201,6 +205,7 @@ class CustomDPOTrainer(DPOTrainer):
         if self.loss_type in ["ipo", "orpo", "simpo"]:
             all_logps = all_logps / valid_length
 
+        # first half is chosen, second half is rejected
         batch_size = batch["input_ids"].size(0) // 2
         chosen_logps, rejected_logps = all_logps.split(batch_size, dim=0)
         chosen_logits, rejected_logits = all_logits.split(batch_size, dim=0)
@@ -233,6 +238,7 @@ class CustomDPOTrainer(DPOTrainer):
 
         return reference_chosen_logps, reference_rejected_logps
 
+    # this is a core function!
     @override
     def get_batch_loss_metrics(
         self,
@@ -243,6 +249,7 @@ class CustomDPOTrainer(DPOTrainer):
         r"""
         Computes the DPO loss and other metrics for the given batch of inputs for train or test.
         """
+
         metrics = {}
         (
             policy_chosen_logps,
@@ -285,6 +292,7 @@ class CustomDPOTrainer(DPOTrainer):
         r"""
         Subclass and override to accept extra kwargs.
         """
+        # this will call get_batch_loss_metrics
         return super().compute_loss(model, inputs, return_outputs)
 
     @override

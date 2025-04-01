@@ -18,6 +18,8 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
 from ...extras import logging
 from ...extras.constants import IGNORE_INDEX
 from .processor_utils import DatasetProcessor, infer_seqlen
+from .pairwise import PairwiseDatasetProcessor
+from typing_extensions import override
 
 
 if TYPE_CHECKING:
@@ -27,59 +29,9 @@ if TYPE_CHECKING:
 logger = logging.get_logger(__name__)
 
 
-class PairwiseDatasetProcessor(DatasetProcessor):
-    def _encode_data_example(
-        self,
-        prompt: Sequence[Dict[str, str]],
-        response: Sequence[Dict[str, str]],
-        system: Optional[str],
-        tools: Optional[str],
-        images: Sequence["ImageInput"],
-        videos: Sequence["VideoInput"],
-        audios: Sequence["AudioInput"],
-    ) -> Tuple[List[int], List[int], List[int], List[int]]:
-        # this is ordered!!!
-        # not by name, but by order
-        chosen_messages = self.template.mm_plugin.process_messages(
-            # include the prompt AND responses here
-            prompt + [response[0]],
-            images,
-            videos,
-            audios,
-            self.processor,
-        )
-        rejected_messages = self.template.mm_plugin.process_messages(
-            prompt + [response[1]], images, videos, audios, self.processor
-        )
-
-        # logger.info_rank0(f"zihe logging message {chosen_messages, rejected_messages}")
-
-        prompt_ids, chosen_ids = self.template.encode_oneturn(self.tokenizer, chosen_messages, system, tools)
-        _, rejected_ids = self.template.encode_oneturn(self.tokenizer, rejected_messages, system, tools)
-
-        if self.template.efficient_eos:
-            chosen_ids += [self.tokenizer.eos_token_id]
-            rejected_ids += [self.tokenizer.eos_token_id]
-
-        prompt_ids, _ = self.template.mm_plugin.process_token_ids(
-            prompt_ids, None, images, videos, audios, self.tokenizer, self.processor
-        )
-        # consider the response is more important
-        source_len, target_len = infer_seqlen(
-            len(prompt_ids), max(len(chosen_ids), len(rejected_ids)), self.data_args.cutoff_len
-        )
-        prompt_ids = prompt_ids[:source_len]
-        chosen_ids = chosen_ids[:target_len]
-        rejected_ids = rejected_ids[:target_len]
-
-        chosen_input_ids = prompt_ids + chosen_ids
-        # chosen labels is basically just empty up till the chosen output message
-        chosen_labels = [IGNORE_INDEX] * source_len + chosen_ids
-        rejected_input_ids = prompt_ids + rejected_ids
-        rejected_labels = [IGNORE_INDEX] * source_len + rejected_ids
-
-        return chosen_input_ids, chosen_labels, rejected_input_ids, rejected_labels
-
+class RDPOPairwiseDatasetProcessor(PairwiseDatasetProcessor):
+    # override the parent pairwise dataset
+    @override
     def preprocess_dataset(self, examples: Dict[str, List[Any]]) -> Dict[str, List[Any]]:
         # build input pairs with format `<bos> X`, `Y1 <eos>` and `Y2 <eos>`
         model_inputs = defaultdict(list)
@@ -90,6 +42,7 @@ class PairwiseDatasetProcessor(DatasetProcessor):
                 )
                 continue
 
+            # process data using parent class method
             chosen_input_ids, chosen_labels, rejected_input_ids, rejected_labels = self._encode_data_example(
                 prompt=examples["_prompt"][i],
                 response=examples["_response"][i],
@@ -99,6 +52,20 @@ class PairwiseDatasetProcessor(DatasetProcessor):
                 videos=examples["_videos"][i] or [],
                 audios=examples["_audios"][i] or [],
             )
+
+            # Add rationale processing
+            rationale = examples.get("_reasoning", [None])[i]
+            if rationale:
+                rationale_ids = self.tokenizer.encode(rationale, add_special_tokens=False)
+                if len(rationale_ids) > 0:
+                    # Truncate if needed
+                    rationale_ids = rationale_ids[: min(len(rationale_ids), 512)]
+                    model_inputs["rationale_ids"].append(rationale_ids)
+                else:
+                    model_inputs["rationale_ids"].append([])
+            else:
+                model_inputs["rationale_ids"].append([])
+
             model_inputs["chosen_input_ids"].append(chosen_input_ids)
             model_inputs["chosen_attention_mask"].append([1] * len(chosen_input_ids))
             model_inputs["chosen_labels"].append(chosen_labels)

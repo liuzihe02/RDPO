@@ -317,44 +317,16 @@ LD_LIBRARY_PATH=/share/apps/glibc-2.28/lib:$LD_LIBRARY_PATH \
 FORCE_TORCHRUN=1 \
 python3 -m llamafactory.cli.llamafactory_cli train $CONFIG_FILE --verbose true 2>&1 | tee training_output.log
 ```
+we've tried to create a new venv and installing certain packages with no binary flag (these packages will build from source):
 
-testing script
 ```bash
-#!/bin/bash
-#$ -S /bin/bash
-#$ -l tmem=4G
-#$ -l gpu=true
-#$ -pe gpu 1
-#$ -R y
-#$ -cwd
-#$ -j y
-#$ -N test_llamafactory
-#$ -l h_rt=00:01:00
-#$ -P aihub_ucl
+pip install wheel packaging torch==2.4.0
+#somehow i need to install these stuff separately
+pip install -v \
+  packaging wheel ninja numpy tqdm datasets python-dateutil sympy==1.13.1 \
+  antlr4-python3-runtime==4.11.1 word2number Pebble timeout-decorator latex2sympy2 \
+  transformers==4.49.0 "vllm>=0.4.3" \
+  torch==2.4.0 flash-attn==2.7.2.post1 bitsandbytes deepspeed==0.16.2 \
+  --no-binary flash-attn,bitsandbytes
 
-# Stop on first error, print commands as they run:
-set -euxo pipefail
-
-# Activate the virtual environment
-source venv/bin/activate
-
-# (Alternatively, if you have a venv:)
-# source /path/to/your_venv/bin/activate
-
-# 2) Print debugging info:
-which python3
-python3 --version
-
-# 3) Simple test script:
-python3 <<EOF
-import torch
-print("PyTorch version:", torch.__version__)
-print("Is CUDA available? ", torch.cuda.is_available())
-
-try:
-    import llamafactory
-    print("Successfully imported LLaMA Factory!")
-except ImportError as e:
-    print("Failed to import LLaMA Factory:", e)
-EOF
 ```

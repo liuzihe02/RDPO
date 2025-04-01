@@ -15,8 +15,8 @@ If the last step doesn't work, try doing `pip install -r requirements.txt --no-b
 ## Notes
 
 - `LlamaFactory` is stored in the `train/` subdirectory, install it in the train subdir before running anything
-  - Data is stored in the LlamaFactory folder
-  - Since we modify this for RDPO, we need to upload the entire package
+  - Data is stored in `LLaMA-Factory/data` and downloaded from `tools/scripts/download_data.sh`
+  - Since we modify this extensively for RDPO, we need to upload the entire package as a folder
 - need to modify the `data/datasets_info.json` in `LLaMa-Factory` **anytime you add new data**
   - Because we use our own copy of LlamaFactory, we may run into some issues
 - `cutoff_len` and `per_device_train_batch_size` are by far largest factors controlling memory usage
@@ -25,6 +25,7 @@ If the last step doesn't work, try doing `pip install -r requirements.txt --no-b
 - Provide absolute file paths for evaluation scripts
 - Decrease number of samples for validation to speed it up
   - If size of training dataset too big, also memory issues
+- For debugging, use `logger.info_rank0(f"zihe logger after process {dataset_module['train_dataset']}")` instead of print. the `logger` object should already have been defined
 
 ## Experiments
 
@@ -58,7 +59,14 @@ This assumes you have already downloaded `LLaMA-Factory` in the `train/` directo
 
 ## Modifying RDPO
 
-### Modifying Data
+Core files we'll have to mess around with and understand whats going on:
+
+For DPO
+- TRL: `trainer/dpo_trainer.py`
+  - Although the `CustomDPOTrainer` subclasses the trl `DPOTrainer`, the `tokenize_row` function of `DPOTrainer` is never actually used! The `super().__init__` actually uses the trl generic `Trainer` class instead
+- llamafactory: `data/loader.py`, `data/processor/pairwise.py`, `train/dpo/trainer.py`, maybe `data/collator.py`?
+  - Note that although stage for dpo is `dpo`, backend it actually uses `rm` and hence the `PairwiseDatasetProcessor`
+- transformers: `trainer.py`
 
 Originally in DPO, we had:
 
@@ -69,39 +77,134 @@ Originally in DPO, we had:
 "reasoning": the first answer is better because...
 ```
 
-So we need to modify how `trl` and llamafactory handles the data
+Flow of data
 
-The main function that processes string inputs into batches of tensors is the `tokenize_row` method in the `DPOTrainer` class from TRL (in the `trl DPO trainer.py` file). This method handles the transformation of individual examples from the dataset into tokenized inputs for the model.
-
-Let's look at the key components:
-
-1. In the TRL `DPOTrainer` class, the `tokenize_row` method (around line 490) handles:
-   - Converting raw text prompts and responses to tokens
-   - Managing truncation logic
-   - Preparing labels for training
-
-2. In LlamaFactory's CustomDPOTrainer implementation (in `dpo/trainer.py`), they inherit this functionality from TRL's DPOTrainer, but customize other aspects of the training process.
-
-3. The actual batch creation happens through a data collator, which is typically `DPODataCollatorWithPadding` in TRL or `PairwiseDataCollatorWithPadding` in LlamaFactory.
-
-If you want to modify how a "reasoning" column is processed differently from "chosen" and "rejected", you would need to:
-
-1. Modify the `tokenize_row` method to handle the additional "reasoning" column
-2. Update the data collator to properly batch the processed reasoning data
-
-The critical path is:
-```
-Raw dataset → tokenize_row → data collator → model inputs
 ```
 
-For LlamaFactory specifically, you should look at:
-1. `dpo/workflow.py` - Where the dataset is loaded and processed
-2. `data.py` - Where data collation happens
-3. `dpo/trainer.py` - Where the CustomDPOTrainer inherits from TRL's DPOTrainer
+---
+llamafactory/train/dpo/workflow.py -> run_dpo func
 
-I'd suggest modifying the `tokenize_row` method in a subclass of TRL's DPOTrainer or LlamaFactory's CustomDPOTrainer to handle your "reasoning" column differently.
+   ...
+   #this dataset_module is a dictionary of HF datasets {"train_dataset":Dataset,"eval_dataset":Dataset}
 
+   #load the dataset module
+   #this is after preprocessing via PairwiseDatasetProcessor
+   dataset_module = get_dataset(template, model_args, data_args, training_args, stage="rm", **tokenizer_module)
 
+   ...
+   # Create data collator, which will put it into the right list form for Tensor
+   # this is an important function that makes the chosen and rejected HF Dataset into one Tensor!
+    data_collator = PairwiseDataCollatorWithPadding(
+        template=template,
+        model=model,
+        pad_to_multiple_of=8,
+        label_pad_token_id=IGNORE_INDEX if data_args.ignore_pad_token_for_loss else tokenizer.pad_token_id,
+        **tokenizer_module,
+    )
+    ...
+   # Initialize our Trainer
+    trainer = CustomDPOTrainer(
+        model=model,
+        ref_model=ref_model,
+        args=training_args,
+        finetuning_args=finetuning_args,
+        data_collator=data_collator,
+        callbacks=callbacks,
+        **dataset_module,
+        **tokenizer_module,
+    )
+        # Training
+    if training_args.do_train:
+        train_result = trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
+        trainer.save_model()
+        #this may cause errors later on but whatever
+        if finetuning_args.include_effective_tokens_per_second:
+            train_result.metrics["effective_tokens_per_sec"] = calculate_tps(
+                dataset_module["train_dataset"], train_result.metrics, stage="rm"
+            )
+
+---
+llamafactory/data/loader.py -> get_dataset func
+
+def get_dataset(template, model_args, data_args, training_args, stage, tokenizer, processor=None):
+
+    # Load and preprocess dataset
+
+    with training_args.main_process_first(desc="load dataset"):
+        dataset = _get_merged_dataset(data_args.dataset, model_args, data_args, training_args, stage)
+        eval_dataset = _get_merged_dataset(data_args.eval_dataset, model_args, data_args, training_args, stage)
+
+    with training_args.main_process_first(desc="pre-process dataset"):
+        dataset = _get_preprocessed_dataset(dataset, data_args, training_args, stage, template, tokenizer, processor)
+        eval_dataset = _get_preprocessed_dataset(eval_dataset, data_args, training_args, stage, template, tokenizer, processor, is_eval=True)
+      ...
+      """
+      logging here produces
+
+      Dataset({
+      features: ['chosen_input_ids', 'chosen_attention_mask', 'chosen_labels', 'rejected_input_ids', 'rejected_attention_mask', 'rejected_labels', 'images', 'videos', 'audios'],
+      num_rows: 100 (number of pairs of groped datapoints)
+
+      This is the Dataset object to be sent to DataCollator
+      """
+      # logger.info_rank0(f"zihe logger after process {dataset_module['train_dataset']}")
+
+      return dataset_module
+   
+
+---
+llamafactory/data/loader.py -> _get_preprocessed_dataset func
+
+       dataset_processor = _get_dataset_processor(
+        data_args, stage, template, tokenizer, processor, do_generate=(training_args.predict_with_generate and is_eval)
+    )
+    ...
+        dataset = dataset.map(
+        dataset_processor.preprocess_dataset,
+         ...
+    )
+    #this is a HF dataset
+    return dataset
+
+---
+llamafactory/data/loader.py -> _get_dataset_processor func
+   ...
+       elif stage == "rm":
+        dataset_processor_class = PairwiseDatasetProcessor
+   return the dataset processor class itself
+)
+
+---
+data/processor/pairwise.py -> PairwiseDatasetProcessor class
+
+this contains the actual code that handles the processor of string from json file
+very important file!
+the order of messages in json file determines what is chosen and what is rejected
+)
+         
+```
+
+flow of how **training** in dpo works in `llamafactory/train/dpo/trainer.py`. The `PairwiseDataCollatorWithPadding` has the final say on how a tensor batch will look like.
+
+```
+trl compute_loss()
+#note that this is only implemented for DPODataCollatorWithPadding
+  ↓
+llamafactory override get_batch_loss_metrics()
+  ↓
+llamafactory override concatenated_forward() → Gets logprobs for chosen/rejected responses
+  ↓
+llamafactory override compute_reference_log_probs() → Gets reference model logprobs
+  ↓
+llamafactory override compute_preference_loss() → Calculates preference loss from these logprobs
+this calls the trl self.dpo_loss
+  ↓
+[combine with other losses, collect metrics, etc.]
+```
+
+### 1. Create RDPO Preprocessor
+
+this is located in `data/processor/rdpo_pairwise.py`
 
 ---
 

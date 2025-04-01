@@ -228,11 +228,15 @@ class PairwiseDataCollatorWithPadding(MultiModalDataCollatorForSeq2Seq):
         r"""
         Pads batched data to the longest sequence in the batch.
 
+        IMPORTANT!!
+
         We generate 2 * n examples where the first n examples represent chosen examples and
         the last n examples represent rejected examples.
         """
         concatenated_features = []
+        # do all the chosen stuff first, then rejected in the second half
         for key in ("chosen", "rejected"):
+            # each feature is one data point
             for feature in features:
                 target_feature = {
                     "input_ids": feature[f"{key}_input_ids"],
