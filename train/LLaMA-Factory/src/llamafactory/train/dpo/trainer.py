@@ -292,7 +292,7 @@ class CustomDPOTrainer(DPOTrainer):
         r"""
         Subclass and override to accept extra kwargs.
         """
-        # this will call get_batch_loss_metrics
+        # this will call the modified get_batch_loss_metrics
         return super().compute_loss(model, inputs, return_outputs)
 
     @override

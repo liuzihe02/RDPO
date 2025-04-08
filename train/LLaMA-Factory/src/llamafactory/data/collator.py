@@ -271,7 +271,8 @@ class RDPOPairwiseDataCollatorWithPadding(MultiModalDataCollatorForSeq2Seq):
         the last n examples represent rejected examples.
         """
         concatenated_features = []
-        # do all the chosen stuff first, then rejected in the second half
+        # do all the chosen stuff first, then rejected in the second part, then reasoning
+        # the layout of this is specified in RDPOPairwiseDatasetProcessor
         for key in ("chosen", "rejected", "reasoning"):
             # each feature is one data point
             for feature in features:
