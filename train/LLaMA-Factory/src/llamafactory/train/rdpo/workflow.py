@@ -14,7 +14,7 @@
 
 from typing import TYPE_CHECKING, List, Optional
 
-from ...data import PairwiseDataCollatorWithPadding, get_dataset, get_template_and_fix_tokenizer
+from ...data import RDPOPairwiseDataCollatorWithPadding, get_dataset, get_template_and_fix_tokenizer
 from ...extras.constants import IGNORE_INDEX
 from ...extras.misc import calculate_tps
 from ...extras.ploting import plot_loss
@@ -47,7 +47,8 @@ def run_rdpo(
     dataset_module = get_dataset(template, model_args, data_args, training_args, stage="rm", **tokenizer_module)
     model = load_model(tokenizer, model_args, finetuning_args, training_args.do_train)
 
-    data_collator = PairwiseDataCollatorWithPadding(
+    # use the data collator
+    data_collator = RDPOPairwiseDataCollatorWithPadding(
         template=template,
         model=model,
         pad_to_multiple_of=8,
@@ -67,7 +68,7 @@ def run_rdpo(
     # Update arguments
     training_args.remove_unused_columns = False  # important for multimodal and pairwise dataset
 
-    # Initialize our Trainer
+    # Initialize our RDPO Trainer
     trainer = CustomRDPOTrainer(
         model=model,
         ref_model=ref_model,

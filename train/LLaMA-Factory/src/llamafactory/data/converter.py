@@ -232,6 +232,7 @@ class RDPODatasetConverter(DatasetConverter):
         return output
 
 
+# write this formatting in the datasets json file
 DATASET_CONVERTERS = {
     "alpaca": AlpacaDatasetConverter,
     "sharegpt": SharegptDatasetConverter,

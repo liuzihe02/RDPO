@@ -181,8 +181,6 @@ def _get_merged_dataset(
             raise ValueError("The dataset is not applicable in the current training stage.")
 
         datasets[dataset_name] = _load_single_dataset(dataset_attr, model_args, data_args, training_args)
-        # check if message is formatted correctly
-        logger.info_rank0(f"zihe reasoning {datasets[dataset_name][0]}")
 
     if merge:
         return merge_dataset(list(datasets.values()), data_args, seed=training_args.seed)
@@ -224,7 +222,7 @@ def _get_dataset_processor(
 
     # note that dpo uses the dataset processor for rm
     elif stage == "rm":
-        # rdpo
+        # zihe rdpo
         if data_args._rdpo_data:
             dataset_processor_class = RDPOPairwiseDatasetProcessor
         # vanilla dpo
@@ -269,7 +267,7 @@ def _get_preprocessed_dataset(
     # zihe need to check how dataset is structured here
     logger.info_rank0(f"zihe before mapping preprocess{dataset}")
 
-    # this will use our DatasetConverters and RDPOPairwiseDatasetProcessor
+    # this will use RDPOPairwiseDatasetProcessor
     dataset = dataset.map(
         dataset_processor.preprocess_dataset,
         batched=True,
@@ -281,10 +279,10 @@ def _get_preprocessed_dataset(
     # zihe needs to check how dataset is also structured here
     logger.info_rank0(f"zihe after mapping preprocess{dataset}")
 
-    # zihe temporary check, you can make this permanently true to inspect the data
-    # if training_args.should_log:
-
+    # TODO: zihe temporary check, you can make this permanently true to inspect the data after preprocess
+    # whats in the inputs and labels
     if True:
+        # if training_args.should_log:
         try:
             print("eval example:" if is_eval else "training example:")
             dataset_processor.print_data_example(next(iter(dataset)))
@@ -341,11 +339,6 @@ def get_dataset(
         eval_dataset = _get_merged_dataset(
             data_args.eval_dataset, model_args, data_args, training_args, stage, merge=training_args.do_predict
         )
-    """
-    [INFO|2025-03-31 18:15:20] llamafactory.data.loader:157 >> zihe logger after loading {'_prompt': [{'content': 'Solve the math problems and provide step-by-step solutions, ending with "The answer is [Insert Final Answer Here]".Q: Susan walked to the market to buy five dozen peaches.  To carry them home, she brought two identically-sized cloth bags and a much smaller knapsack.  Into the knapsack she placed half as many peaches as she placed in each of the two cloth bags. How many peaches did she put in the knapsack?', 'role': 'user'}], '_response': [{'content': "Let's think step by step.\nSusan bought five dozen peaches, which means 5 * 12 = 60 peaches. She put half as many peaches into the knapsack as she put into each cloth bag. Let's say she put x peaches into each cloth bag. So, she put x / 2 peaches into the knapsack. Since she put the same number of peaches into each cloth bag, she put two times x peaches into the cloth bags, which is 2x. Therefore, we have x + x + x / 2 = 60. Simplifying this equation, we get 2.5x = 60. Dividing both sides by 2.5, we find x = 24. So, she put x / 2 = 24 / 2 = 12 peaches into the knapsack. The answer is 12.", 'role': 'assistant'}, {'content': "Let's think step by step.\n5 dozen = 5 * 12 = 60. Susan has 2 cloth bags so she placed 60 / 2 = 30 peaches in each bag and since the knapsack is half of this amount, she placed 30 / 2 = 15 peaches in the knapsack. The answer is 15.", 'role': 'assistant'}], '_system': '', '_tools': '', '_images': None, '_videos': None, '_audios': None}
-    """
-    # use logger to inspect dataset. view the first row
-    logger.info_rank0(f"zihe logger after loading {dataset[0]}")
 
     with training_args.main_process_first(desc="pre-process dataset"):
         dataset = _get_preprocessed_dataset(
@@ -405,13 +398,7 @@ def get_dataset(
             if len(eval_dataset):
                 dataset_module["eval_dataset"] = eval_dataset
 
-        """
-        logging here produces
-
-        Dataset({
-        features: ['chosen_input_ids', 'chosen_attention_mask', 'chosen_labels', 'rejected_input_ids', 'rejected_attention_mask', 'rejected_labels', 'images', 'videos', 'audios'],
-        num_rows: 100 (number of pairs of groped datapoints)
-        """
+        # see what columns there are; these are already ids
         # logger.info_rank0(f"zihe logger after process {dataset_module['train_dataset']}")
 
         return dataset_module

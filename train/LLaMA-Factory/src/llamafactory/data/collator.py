@@ -26,6 +26,8 @@ from transformers import DataCollatorForSeq2Seq
 from ..extras.constants import AUDIO_PLACEHOLDER, IGNORE_INDEX, IMAGE_PLACEHOLDER
 from ..extras.packages import is_pillow_available
 
+from typing_extensions import override
+
 
 if is_pillow_available():
     from PIL import Image
@@ -248,6 +250,42 @@ class PairwiseDataCollatorWithPadding(MultiModalDataCollatorForSeq2Seq):
                 }
                 concatenated_features.append(target_feature)
 
+        return super().__call__(concatenated_features)
+
+
+# very similar to the PairwiseDataCollatorWithPadding data class but with reasoning column too
+@dataclass
+class RDPOPairwiseDataCollatorWithPadding(MultiModalDataCollatorForSeq2Seq):
+    r"""
+    Data collator for RDPO pairwise data.
+    """
+
+    @override
+    def __call__(self, features: Sequence[Dict[str, Any]]) -> Dict[str, "torch.Tensor"]:
+        r"""
+        Pads batched data to the longest sequence in the batch.
+
+        IMPORTANT!!
+
+        We generate 2 * n examples where the first n examples represent chosen examples and
+        the last n examples represent rejected examples.
+        """
+        concatenated_features = []
+        # do all the chosen stuff first, then rejected in the second half
+        for key in ("chosen", "rejected", "reasoning"):
+            # each feature is one data point
+            for feature in features:
+                target_feature = {
+                    "input_ids": feature[f"{key}_input_ids"],
+                    "attention_mask": feature[f"{key}_attention_mask"],
+                    "labels": feature[f"{key}_labels"],
+                    "images": feature["images"],
+                    "videos": feature["videos"],
+                    "audios": feature["audios"],
+                }
+                concatenated_features.append(target_feature)
+
+        # we use the parent parent class for this
         return super().__call__(concatenated_features)
 
 

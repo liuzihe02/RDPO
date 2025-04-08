@@ -216,9 +216,12 @@ def get_dataset(template, model_args, data_args, training_args, stage, tokenizer
 ---
 llamafactory/data/loader.py -> _get_merged_dataset
 llamafactory/data/loader.py -> _load_single_dataset
+
+---
 llamafactory/data/converter.py -> align_dataset
 
-here, we specify the RDPO data format
+here in converter.py, we specify the RDPO data format for the dataset converter,
+to convert from json to Dataset object
 RDPODatasetConverter(DatasetConverter):
    
 
@@ -247,10 +250,9 @@ llamafactory/data/loader.py -> _get_dataset_processor func
 ---
 data/processor/pairwise.py -> PairwiseDatasetProcessor class
 
-this contains the actual code that handles the processor of string from json file
-very important file!
+this contains the actual code that handles the processing from a Dataset object directly from json
+to the right format for training
 the order of messages in json file determines what is chosen and what is rejected
-)
          
 ```
 
@@ -286,27 +288,65 @@ this is located in `data/processor/rdpo_pairwise.py` to include `RDPOPairwiseDat
 - update `__init__.py` to accept `RDPOPairwiseDatasetProcessor`
 
 - update `loader.py` in a super hacky way to accept `RDPOPairwiseDatasetProcessor` as another processor
-  - this file is extensively modified
+  - if `stage=="rm"` and `data_args._rdpo_data` is `True`, then use the `RDPOPairwiseDatasetProcessor`
   - because `get_dataset` in `loader.py` ultimately calls `_get_dataset_processor` which decides `PairwiseDatasetProcessor` or `RDPOPairwiseDatasetProcessor`
   - However the `finetuning_args` is not passed in, only `data_args` are passed in
   - so the flag for whether `rdpo` activates has to be through `data_args`
-  - we include `data_args._rdpo_data` in `data_args` too, and this is only updated in `run_rdpo` to True, otherwise its default `False`
+  - we include `data_args._rdpo_data` in `data_args` too, and this is only updated in `train/rdpo/workflow.py` to True, otherwise its default `False`
 
-Make sure to edit the training yaml file to include `genrm_rdpo` as the dataset too
+Make sure to edit the training yaml file to include `genrm_rdpo` as the dataset too, which is defined in `dataset_info.json`
 
-Note there is a difference between `data_args` of type `DataArguments` which is provided in training yaml config file, and `dataset_attr` of type `DatasetAttr` which is specified in `dataset_info.json`
+> Note there is a difference between `data_args` of type `DataArguments` which is provided in training yaml config file, and `dataset_attr` of type `DatasetAttr` which is specified in `dataset_info.json`
 
-Note that `input_ids` include the prompt and chosen/rejected/reasoning etc and `labels` only include the chosen/rejected/reasoning etc
+> Note that `input_ids` include the prompt and chosen/rejected/reasoning etc and `labels` only include the chosen/rejected/reasoning etc
 
-Note that although stage for dpo is `dpo`, backend it actually uses `rm` and hence the `PairwiseDatasetProcessor`
+> Note that although stage for dpo is `dpo`, backend it actually uses `rm` and hence the `PairwiseDatasetProcessor`. For rdpo, the stage is `rm` but we provide an extra argument `rdpo` in the training yaml file
 
-### 3. Create a new file: `data/collator/rdpo_collator.py`
+### 3. Modify collator
 
-### 4. Create a new file: `train/rdpo/trainer.py`
+Modify `collator.py` to also include `RDPOPairwiseDataCollatorWithPadding`, which is a subclass of `PairwiseDataCollatorWithPadding` to include reasoning column
+- This means `batch` input to our `trainer.py` functions will now have the first dimension split into chosen, rejected, and reasoning
 
-### 5. Create a new file: `train/rdpo/workflow.py`
+Modify `data/__init__.py` to allow `RDPOPairwiseDataCollatorWithPadding` to be seen too
+
+### 4. Create `train/rdpo/trainer.py`
+
+Modify the trainer to take in the RDPO loss term accordingly
+
+### 5. Create `train/rdpo/workflow.py`
 
 ### 6. Modify `hparams/finetuning_args.py` to include new hparams
+
+## CUDA Memory Issues
+
+### Clearing GPU Memory
+
+Sometimes running multiple experiments, memory can remain allocated in the GPU. We can clear the GPU memory in between runs
+
+```bash
+python3 -c "import torch; torch.cuda.empty_cache()"
+```
+
+### Reducing Memory Usage
+
+Decrease `per_device_train_batch_size`
+Decrease `lora_rank`
+Decrease `cutoff_len` for data
+
+*Meeting with Peter*
+
+setup of rdpo, how messages are structured
+flow of data
+
+do we need the verification tag in the input?
+
+specific pointed details on why correct/incorrect, rather than critique on all steps of correct/incorrect
+pass to LLM to summarize reasoning data, what different between 2 solutions
+final training only on this
+
+- remove rdpo keep only reasoning, see grad graph
+- see if model can overfit on a single data point
+- magnitude of rdpo loss very different from dpo loss
 
 ---
 

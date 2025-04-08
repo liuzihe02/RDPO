@@ -124,7 +124,7 @@ class DataArguments:
         },
     )
 
-    # zihe rdpo indicator to mimic finetuning args
+    # zihe rdpo indicator to mimic finetuning args, this is quite hacky
     # this should NOT be provided in the yaml file
     _rdpo_data: bool = field(
         default=False,

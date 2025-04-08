@@ -12,11 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 from .collator import (
     KTODataCollatorWithPadding,
     MultiModalDataCollatorForSeq2Seq,
     PairwiseDataCollatorWithPadding,
     SFTDataCollatorWith4DAttentionMask,
+    # allow RDPO collator to be seen too
+    RDPOPairwiseDataCollatorWithPadding,
 )
 from .data_utils import Role, split_dataset
 from .loader import get_dataset

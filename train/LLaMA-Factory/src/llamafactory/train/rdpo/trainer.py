@@ -1,20 +1,3 @@
-# Copyright 2024 HuggingFace Inc. and the LlamaFactory team.
-#
-# This code is inspired by the HuggingFace's TRL library.
-# https://github.com/huggingface/trl/blob/v0.8.0/trl/trainer/dpo_trainer.py
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 import warnings
 from collections import defaultdict
 from contextlib import nullcontext
@@ -30,10 +13,9 @@ from typing_extensions import override
 
 from ...extras.constants import IGNORE_INDEX
 from ...extras.packages import is_transformers_version_greater_than
+from ..dpo.trainer import CustomDPOTrainer
 from ..callbacks import SaveProcessorCallback
 from ..trainer_utils import create_custom_optimizer, create_custom_scheduler, get_batch_logps, nested_detach
-from ..dpo.trainer import CustomDPOTrainer
-
 
 if TYPE_CHECKING:
     from transformers import PreTrainedModel, ProcessorMixin
@@ -42,13 +24,140 @@ if TYPE_CHECKING:
 
 
 class CustomRDPOTrainer(CustomDPOTrainer):
-    def __init__(
-        self,
-        model: Union["PreTrainedModel", torch.nn.Module],
-        ref_model: Optional[Union["PreTrainedModel", torch.nn.Module]],
-        finetuning_args: "FinetuningArguments",
-        processor: Optional["ProcessorMixin"],
-        disable_dropout: bool = True,
-        **kwargs,
-    ):
-        super().__init__(model, ref_model, finetuning_args, processor, disable_dropout, **kwargs)
+    @override
+    def __init__(self, *args, reasoning_weight: float = 0.5, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.reasoning_weight = reasoning_weight
+
+    @override
+    def concatenated_forward(
+        self, model: "PreTrainedModel", batch: Dict[str, "torch.Tensor"]
+    ) -> Tuple[
+        "torch.Tensor", "torch.Tensor", "torch.Tensor", "torch.Tensor", "torch.Tensor", "torch.Tensor", "torch.Tensor"
+    ]:
+        r"""
+        Computes the sum log probabilities of the labels under given logits if loss_type is not IPO, ORPO or SimPO.
+
+
+        this splits up a batch tensor into the relevant stuff
+
+        note that this includes a reasoning column for the third column
+
+        Otherwise the average log probabilities.
+
+        the batch here already contains logits for chosen, rejected, reasoning
+        the way this is structured is defined in RDPOPairwiseDataCollatorWithPadding
+        """
+        if self.finetuning_args.use_ref_model:
+            batch = nested_detach(batch, clone=True)  # avoid error
+
+        # this batch will be a tensor of size (batch_size_per_device *3)
+        # (chosen, rejected, reasoning)
+        # this may cause cuda memory issues, reduce batch size to alleviate this problem
+        all_logits: "torch.Tensor" = model(**batch, return_dict=True, use_cache=False).logits.to(torch.float32)
+        all_logps, valid_length = get_batch_logps(logits=all_logits, labels=batch["labels"])
+        if self.loss_type in ["ipo", "orpo", "simpo"]:
+            all_logps = all_logps / valid_length
+
+        # first third is chosen, next third is rejected, last third is reasoning
+        batch_size = batch["input_ids"].size(0) // 3
+        chosen_logps, rejected_logps, reasoning_logps = all_logps.split(batch_size, dim=0)
+        chosen_logits, rejected_logits, reasoning_logits = all_logits.split(batch_size, dim=0)
+        # these are all the same
+        chosen_length, _, _ = valid_length.split(batch_size, dim=0)
+
+        # default loss is sigmoid here
+        # last one is a normalized chosen_logps
+        if self.loss_type in ["ipo", "orpo", "simpo"]:
+            # order of first 2, the chosen and rejected logps must stay the same
+            return (
+                chosen_logps,
+                rejected_logps,
+                reasoning_logps,
+                chosen_logits,
+                rejected_logits,
+                reasoning_logits,
+                chosen_logps,
+            )
+        else:
+            return (
+                chosen_logps,
+                rejected_logps,
+                reasoning_logps,
+                chosen_logits,
+                rejected_logits,
+                reasoning_logits,
+                chosen_logps / chosen_length,
+            )
+
+    # # the compute reference log probs can remain the same
+    # @override
+    # def get_batch_loss_metrics(
+    #     self,
+    #     model: "PreTrainedModel",
+    #     batch: Dict[str, "torch.Tensor"],
+    #     train_eval: Literal["train", "eval"] = "train",
+    # ) -> Tuple["torch.Tensor", Dict[str, "torch.Tensor"]]:
+    #     r"""
+    #     Computes the RDPO loss and other metrics for the given batch of inputs for train or test.
+    #     """
+    #     metrics = {}
+
+    #     (
+    #         policy_chosen_logps,
+    #         policy_rejected_logps,
+    #         policy_reasoning_logps,
+    #         policy_chosen_logits,
+    #         policy_rejected_logits,
+    #         policy_reasoning_logits,
+    #         policy_chosen_logps_avg,
+    #     ) = self.concatenated_forward(model, batch)
+
+    #     print(f"shape of data is{policy_chosen_logits.shape}")
+
+    #     # Get reference log probs
+    #     reference_chosen_logps, reference_rejected_logps = self.compute_reference_log_probs(model, batch)
+
+    #     # Compute dpo preference loss. note
+    #     dpo_losses, chosen_rewards, rejected_rewards = self.compute_preference_loss(
+    #         policy_chosen_logps,
+    #         policy_rejected_logps,
+    #         reference_chosen_logps,
+    #         reference_rejected_logps,
+    #     )
+
+    #     # not sure why this is included in default DPO implementation for LLaMA-Factory but some form of sft is included here
+    #     # default ftx_gamma is zero
+    #     sft_loss = -policy_chosen_logps_avg
+    #     if self.ftx_gamma > 1e-6:
+    #         dpo_losses += self.ftx_gamma * sft_loss
+
+    #     # Combine DPO loss with reasoning loss
+    #     combined_losses = dpo_losses
+    #     if reasoning_loss.item() != 0:
+    #         combined_losses = combined_losses + self.reasoning_weight * reasoning_loss
+
+    #     # Add metrics
+    #     prefix = "eval_" if train_eval == "eval" else ""
+    #     metrics[f"{prefix}rewards/chosen"] = chosen_rewards.mean().item()
+    #     metrics[f"{prefix}rewards/rejected"] = rejected_rewards.mean().item()
+    #     metrics[f"{prefix}rewards/accuracies"] = (chosen_rewards > rejected_rewards).float().mean().item()
+    #     metrics[f"{prefix}rewards/margins"] = (chosen_rewards - rejected_rewards).mean().item()
+    #     metrics[f"{prefix}logps/chosen"] = policy_chosen_logps.mean().item()
+    #     metrics[f"{prefix}logps/rejected"] = policy_rejected_logps.mean().item()
+    #     metrics[f"{prefix}logits/chosen"] = policy_chosen_logits.mean().item()
+    #     metrics[f"{prefix}logits/rejected"] = policy_rejected_logits.mean().item()
+
+    #     # Add reasoning loss to metrics
+    #     if reasoning_loss.item() != 0:
+    #         metrics[f"{prefix}reasoning_loss"] = reasoning_loss.detach().item()
+    #         metrics[f"{prefix}dpo_loss"] = dpo_losses.mean().item()
+    #         metrics[f"{prefix}total_loss"] = combined_losses.mean().item()
+
+    #     # Add special metrics for ORPO
+    #     if self.loss_type == "orpo":
+    #         sft_loss = -policy_chosen_logps_avg
+    #         metrics[f"{prefix}sft_loss"] = sft_loss.mean().item()
+    #         metrics[f"{prefix}odds_ratio_loss"] = ((dpo_losses - sft_loss) / self.beta).mean().item()
+
+    #     return combined_losses.mean(), metrics

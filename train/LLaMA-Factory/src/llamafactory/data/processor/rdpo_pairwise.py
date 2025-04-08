@@ -64,7 +64,9 @@ class RDPOPairwiseDatasetProcessor(PairwiseDatasetProcessor):
             prompt, response[:2], system, tools, images, videos, audios
         )
 
-        # Process reasoning if it exists
+        # Process reasoning
+        # ids here refer to prompt + reasoning
+        # labels is just the prompt itself
         reasoning_input_ids, reasoning_labels = [], []
         # Process reasoning message
         reasoning_message = self.template.mm_plugin.process_messages(
@@ -87,7 +89,9 @@ class RDPOPairwiseDatasetProcessor(PairwiseDatasetProcessor):
         )
 
         # Apply length constraints
-        # zihe TODO: the way the len(reasoning_ids) instead of using max may cause problems but hopefully its fine
+        # zihe TODO: the way the len(reasoning_ids) instead of using max may cause problems but hopefully its fine if the cutoff length is long enough
+        # source length is max length or prompt
+        # target length is max length for reasoning
         source_len, target_len = infer_seqlen(len(prompt_ids), len(reasoning_ids), self.data_args.cutoff_len)
         prompt_ids = prompt_ids[:source_len]
         reasoning_ids = reasoning_ids[:target_len]
