@@ -25,9 +25,17 @@ if TYPE_CHECKING:
 
 class CustomRDPOTrainer(CustomDPOTrainer):
     @override
-    def __init__(self, *args, reasoning_weight: float = 0.5, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.reasoning_weight = reasoning_weight
+    def __init__(
+        self,
+        model: Union["PreTrainedModel", torch.nn.Module],
+        ref_model: Optional[Union["PreTrainedModel", torch.nn.Module]],
+        finetuning_args: "FinetuningArguments",
+        processor: Optional["ProcessorMixin"],
+        disable_dropout: bool = True,
+        **kwargs,
+    ):
+        super().__init__(model, ref_model, finetuning_args, processor, disable_dropout, **kwargs)
+        self.reasoning_weight = finetuning_args.reasoning_weight
 
     @override
     def concatenated_forward(
@@ -120,14 +128,14 @@ class CustomRDPOTrainer(CustomDPOTrainer):
             policy_chosen_logps_avg,
         ) = self.concatenated_forward(model, batch)
 
-        # logps of shape (batch,)
-        print(f"zihe check shape of policy chosen logps is{policy_chosen_logps.shape}")
-        print(f"zihe check shape of policy rejected logps is{policy_rejected_logps.shape}")
-        print(f"zihe check shape of policy reasoning logps is{policy_reasoning_logps.shape}")
-        # logits of shape (batch, sequence, d_model)
-        print(f"zihe check shape of policy chosen logits is{policy_chosen_logits.shape}")
-        print(f"zihe check shape of policy rejected logits is{policy_rejected_logits.shape}")
-        print(f"zihe check shape of policy reasoning logits is{policy_reasoning_logits.shape}")
+        # # logps of shape (batch,)
+        # print(f"zihe check shape of policy chosen logps is{policy_chosen_logps.shape}")
+        # print(f"zihe check shape of policy rejected logps is{policy_rejected_logps.shape}")
+        # print(f"zihe check shape of policy reasoning logps is{policy_reasoning_logps.shape}")
+        # # logits of shape (batch, sequence, d_model)
+        # print(f"zihe check shape of policy chosen logits is{policy_chosen_logits.shape}")
+        # print(f"zihe check shape of policy rejected logits is{policy_rejected_logits.shape}")
+        # print(f"zihe check shape of policy reasoning logits is{policy_reasoning_logits.shape}")
 
         # Get reference log probs
         # since compute_reference_log_probs calls a method that we override,
@@ -135,7 +143,7 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         # we must be careful to keep the order of arguments to allow this to work
         reference_chosen_logps, reference_rejected_logps = self.compute_reference_log_probs(model, batch)
 
-        print(f"zihe check shape of reference chosen logps is{reference_chosen_logps.shape}")
+        # print(f"zihe check shape of reference chosen logps is{reference_chosen_logps.shape}")
 
         # Compute dpo preference loss
         # this takes in logprobs, which is already averaged over sequence
@@ -146,7 +154,7 @@ class CustomRDPOTrainer(CustomDPOTrainer):
             reference_rejected_logps,
         )
         # check dpo loss shape, which is simply (batch,)
-        print(f"zihe check dpo loss shape is {dpo_losses.shape}")
+        # print(f"zihe check dpo loss shape is {dpo_losses.shape}")
 
         # not sure why this is included in default DPO implementation for LLaMA-Factory but some form of sft is included here
         # default ftx_gamma is zero

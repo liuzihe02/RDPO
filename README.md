@@ -93,6 +93,8 @@ We use the [GenRM](https://huggingface.co/datasets/flowingpurplecrane/genrm) dat
 
 We use a subset of `num_samples`, where we select a pair of correct and incorrect answer for each sample.
 
+Scripts are named as `experiment_type-model-model_size-dataset-training_method`, e.g. `train/scripts/train-qwen2.5-0.5b-genrm-rdpo`
+
 ## Setup
 
 This assumes you have already downloaded `LLaMA-Factory` in the `train/` directory
@@ -315,7 +317,11 @@ Modify the trainer to take in the RDPO loss term accordingly
 
 ### 5. Create `train/rdpo/workflow.py`
 
+Modify the `run_rdpo` in the workflow accordingly
+
 ### 6. Modify `hparams/finetuning_args.py` to include new hparams
+
+We add an extra field `reasoning_weight` to the finetuning args with default value `0.5`
 
 ## CUDA Memory Issues
 

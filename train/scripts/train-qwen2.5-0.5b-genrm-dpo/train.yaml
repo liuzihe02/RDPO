@@ -8,16 +8,13 @@ trust_remote_code: true
 ### method
 
 #what kind of training
-# still provide dpo here even if you use rdpo
 stage: dpo
-#if you use dpo, need to specify if RDPO or not!
-rdpo: true
 #true for training, false for eval
 do_train: true
 do_eval: false
 #Fine-tuning method. Optional: freeze, lora, full
 finetuning_type: lora
-lora_rank: 1
+lora_rank: 2
 lora_target: all
 deepspeed: examples/deepspeed/ds_z2_offload_config.json # choices: [ds_z0_config.json, ds_z2_config.json, ds_z3_config.json]
 pref_beta: 0.1
@@ -26,13 +23,11 @@ pref_loss: sigmoid # choices: [sigmoid (dpo), orpo, simpo]
 ### dataset
 
 #must exist locally, in the LlamaFactory dataset folder
-#remember to use the RDPO dataset format
-dataset: genrm_rdpo
+dataset: genrm_dpo
 #Dataset template, please ensure that the dataset template corresponds to the model.
-# though i think this is just to format the dataset questions?
 template: qwen
-#this can significantly affect cuda memory use; reduce this if memory problems too much
-cutoff_len: 128
+#this can significantly affect cuda memory use
+cutoff_len: 512
 #subset of entire training set, for experimentation
 # only use positive numbers here
 # set it to the size of the dataset
@@ -41,20 +36,20 @@ overwrite_cache: true
 preprocessing_num_workers: 16
 
 ### output
-output_dir: output_models/qwen2.5-0.5b-genrm_rdpo
+output_dir: output_models/train-qwen2.5-0.5b-genrm-dpo
 logging_steps: 1
-save_steps: 5
+save_steps: 3
 plot_loss: true
 overwrite_output_dir: true
 save_only_model: true
 
 ### train
-per_device_train_batch_size: 4 #may need to reduce batch size since reasoning adds more data
+per_device_train_batch_size: 2
 #stores these gradients instead of immediately updating after every batch
 #best to keep the same or increase
 gradient_accumulation_steps: 8
 learning_rate: 5.0e-6
-num_train_epochs: 10.0
+num_train_epochs: 2.0
 lr_scheduler_type: cosine
 warmup_ratio: 0.1
 bf16: true

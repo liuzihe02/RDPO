@@ -7,14 +7,14 @@ tags:
 - lora
 - generated_from_trainer
 model-index:
-- name: qwen2.5-0.5b-genrm_dpo-2000
+- name: train-qwen2.5-0.5b-genrm-dpo
   results: []
 ---
 
 <!-- This model card has been generated automatically according to the information the Trainer had access to. You
 should probably proofread and complete it, then remove this comment. -->
 
-# qwen2.5-0.5b-genrm_dpo-2000
+# train-qwen2.5-0.5b-genrm-dpo
 
 This model is a fine-tuned version of [Qwen/Qwen2.5-0.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct) on the genrm_dpo dataset.
 

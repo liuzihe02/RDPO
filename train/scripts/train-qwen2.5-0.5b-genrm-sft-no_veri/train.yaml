@@ -2,7 +2,7 @@
 model_name_or_path: Qwen/Qwen2.5-0.5B-Instruct
 #qlora
 quantization_bit: 4
-quantization_method: bitsandbytes  # choices: [bitsandbytes (4/8), hqq (2/3/4/5/6/8), eetq (8)]
+quantization_method: bitsandbytes # choices: [bitsandbytes (4/8), hqq (2/3/4/5/6/8), eetq (8)]
 trust_remote_code: true
 
 ### method
@@ -16,7 +16,7 @@ do_eval: false
 finetuning_type: lora
 lora_rank: 2
 lora_target: all
-deepspeed: examples/deepspeed/ds_z2_offload_config.json  # choices: [ds_z0_config.json, ds_z2_config.json, ds_z3_config.json]
+deepspeed: examples/deepspeed/ds_z2_offload_config.json # choices: [ds_z0_config.json, ds_z2_config.json, ds_z3_config.json]
 
 ### dataset
 
@@ -34,7 +34,7 @@ overwrite_cache: true
 preprocessing_num_workers: 16
 
 ### output
-output_dir: output_models/qwen2.5-0.5b-genrm-sft-no_veri
+output_dir: output_models/train-qwen2.5-0.5b-genrm-sft-no_veri
 logging_steps: 1
 save_steps: 3
 plot_loss: true

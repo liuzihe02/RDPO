@@ -209,6 +209,12 @@ class RLHFArguments:
         metadata={"help": "The type of the reward model in PPO training. Lora model only supports lora training."},
     )
 
+    # zihe custom rdpo hyperparams
+    reasoning_weight: float = field(
+        default=0.5,
+        metadata={"help": "The reasoning weight in the RDPO loss."},
+    )
+
 
 @dataclass
 class GaloreArguments:
