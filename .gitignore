@@ -5,9 +5,10 @@
 .DS_Store
 local*
 
-#ignore venvs
+# Ignore any file or directory with 'venv' in the name
+*venv*
 venv/
-.venv/
+venv2/
 
 #ignore cache
 *.pyc

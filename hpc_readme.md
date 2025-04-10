@@ -36,7 +36,7 @@ qrsh -l tmem=120G,gpu=true,h_rt=12:00:00,gpu_type=h100 -P aihub_ucl
 for shorter time/less memory etc
 
 ```bash
-qrsh -l tmem=30G,gpu=true,h_rt=00:30:00,gpu_type=h100 -P aihub_ucl
+qrsh -l tmem=50G,gpu=true,h_rt=01:00:00,gpu_type=h100 -P aihub_ucl
 ```
 
 with scratch space (local storage on SSD) requested
@@ -175,8 +175,8 @@ Note that I have added the following extra lines to the `~/.bashrc` file
 ```bash
 #these source commands uses the existing settings in shared folders to setup relevant packages and environment variables
 
-#sets up neccessary env variables to use python 3.11.9
-source /share/apps/source_files/python/python-3.11.9.source
+#sets up neccessary env variables to use a specific version of python
+source /share/apps/source_files/python/python-3.10.0.source
 
 #uses newer version of software like gcc and g++
 source /opt/rh/devtoolset-9/enable
@@ -317,16 +317,50 @@ LD_LIBRARY_PATH=/share/apps/glibc-2.28/lib:$LD_LIBRARY_PATH \
 FORCE_TORCHRUN=1 \
 python3 -m llamafactory.cli.llamafactory_cli train $CONFIG_FILE --verbose true 2>&1 | tee training_output.log
 ```
+
+## Try Again
+
+make sure `pip` is the latest version
+
+
 we've tried to create a new venv and installing certain packages with no binary flag (these packages will build from source):
 
 ```bash
-pip install wheel packaging torch==2.4.0
-#somehow i need to install these stuff separately
-pip install -v \
-  packaging wheel ninja numpy tqdm datasets python-dateutil sympy==1.13.1 \
-  antlr4-python3-runtime==4.11.1 word2number Pebble timeout-decorator latex2sympy2 \
-  transformers==4.49.0 "vllm>=0.4.3" \
-  torch==2.4.0 flash-attn==2.7.2.post1 bitsandbytes deepspeed==0.16.2 \
-  --no-binary flash-attn,bitsandbytes
+#somehow need to install these stuff separately
+pip3 install wheel packaging torch==2.6.0
+#install regularly
+pip3 install -v ninja numpy tqdm datasets python-dateutil sympy==1.13.1 antlr4-python3-runtime==4.11.1 word2number Pebble timeout-decorator latex2sympy2 deepspeed==0.16.2 transformers==4.51.0 bitsandbytes
+```
 
+build our own version of `xformers`
+```bash
+# (Optional) Makes the build much faster
+pip3 install ninja
+# Set TORCH_CUDA_ARCH_LIST if running and building on different GPU types
+# (this can take dozens of minutes)
+pip3 install -v -U git+https://github.com/facebookresearch/xformers.git@main#egg=xformers
+```
+
+Navigate to llamafactory and install it there
+```bash
+cd LLaMA-Factory
+# use no deps to resolve dependency conflicts
+pip install --no-deps -e .
+```
+
+```bash
+#install without binaries
+pip3 install -v flash-attn==2.7.2.post1 --no-binary flash-attn
+```
+
+## Minimal Dependencies
+
+```bash
+pip install tqdm packaging numpy wheel torch==2.4.0 transformers==4.49.0 datasets==3.2.0 accelerate==1.2.1 peft==0.12.0 trl==0.9.6 bitsandbytes==0.43.2 deepspeed==0.16.4 triton==3.0.0
+```
+
+install llamafactory
+```bash
+cd LLaMA-Factory
+pip install -e ".[torch,metrics]"
 ```
