@@ -36,7 +36,7 @@ qrsh -l tmem=120G,gpu=true,h_rt=12:00:00,gpu_type=h100 -P aihub_ucl
 for shorter time/less memory etc
 
 ```bash
-qrsh -l tmem=50G,gpu=true,h_rt=01:00:00,gpu_type=h100 -P aihub_ucl
+qrsh -l tmem=50G,gpu=true,h_rt=02:00:00,gpu_type=h100 -P aihub_ucl
 ```
 
 with scratch space (local storage on SSD) requested
@@ -173,20 +173,26 @@ The HPC setup you're using explicitly separates nodes into two types:
 Note that I have added the following extra lines to the `~/.bashrc` file
 
 ```bash
-#these source commands uses the existing settings in shared folders to setup relevant packages and environment variables
+# User specific aliases and functions
 
-#sets up neccessary env variables to use a specific version of python
-source /share/apps/source_files/python/python-3.10.0.source
+ User specific aliases and functions
+# Activates nano
+export PATH=/share/apps/nano-5.8/bin:$PATH
 
-#uses newer version of software like gcc and g++
+# Uses newer version of software like gcc and g++
 source /opt/rh/devtoolset-9/enable
 
-#for the rest, there isnt a source file available so we manually set environment variables ourselves
+# Sets up necessary env variables to use newer python
+source /share/apps/source_files/python/python-3.10.0.source
 
-#adds nano to path variable
-#export makes the env variable available to all subsequnt commands
-#we basically append the path to nano bin to the existing path variable
-export PATH=/share/apps/nano-5.8/bin:$PATH
+#use the right version of cuda! make sure it exists in share apps
+export PATH=/share/apps/cuda-12.3/bin:$PATH
+export LD_LIBRARY_PATH=/share/apps/cuda-12.3/lib64:$LD_LIBRARY_PATH
+export CUDA_HOME=/share/apps/cuda-12.3
+
+# Override cmake *AFTER* all the others to take priority
+# newer version needed to compile stuff
+export PATH=/share/apps/cmake-3.26.4/bin:$PATH
 ```
 
 The `source` cmd is used to execute a script or load env variables into the current session.
@@ -261,99 +267,9 @@ For detailed information on the system's cpu architecture, use `lscpu`. To see t
 
 Each time you login into the UCL network, you may need to download data again for some reason. Maybe to load it in some kind of cache.
 
-## Weird GLIBC issues
-
-python3 error
-segmentation fault
-
-try importing llamafactory with the new glibc 2.28 at least
-
-```bash
-#!/bin/bash
-
-#change directory
-cd ../../LLaMA-Factory
-PROJECT_NAME="RDPO"
-#make all gpus avaiable for training
-export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
-export WANDB_API_KEY=f318ffd0dcf5d31701fd33aee12e57e9cf15444f
-export WANDB_PROJECT=$PROJECT_NAME
-#disable WANDB
-export WANDB_MODE=disabled
-#randomly select a port number for distributed training config
-MASTER_PORT=$(shuf -i 20000-30000 -n 1)
-export MASTER_PORT
-#Configures PyTorch's CUDA memory allocation to use expandable segments
-export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
-
-MODEL_NAME="rdpo"
-export WANDB_RUN_NAME=$MODEL_NAME
-
-# Get config file path
-CONFIG_FILE="../scripts/train-qwen2.5-0.5b-genrm-dpo/qwen2.5-0.5b-genrm-dpo.yaml"
-
-# Extract output directory from yaml file using grep with a pattern that anchors to the beginning of the line
-OUTPUT_DIR=$(grep -m1 "^output_dir:" "$CONFIG_FILE" | cut -d':' -f2 | tr -d ' ')
-
-# Check if output directory exists
-if [ -d "$OUTPUT_DIR" ]; then
-    echo "Error: Output directory '$OUTPUT_DIR' already exists. Aborting to prevent overwrite."
-    exit 1
-else
-    echo "Output directory '$OUTPUT_DIR' does not exist. Safe to proceed."
-fi
-
-# Check memory status
-echo "Current memory status:"
-free -h
-
-# Debug settings
-export PYTHONFAULTHANDLER=1
-export TORCH_DISTRIBUTED_DEBUG=DETAIL
-export NCCL_DEBUG=INFO
-
-# Run with glibc path and use python3 with output logging
-LD_LIBRARY_PATH=/share/apps/glibc-2.28/lib:$LD_LIBRARY_PATH \
-FORCE_TORCHRUN=1 \
-python3 -m llamafactory.cli.llamafactory_cli train $CONFIG_FILE --verbose true 2>&1 | tee training_output.log
-```
-
-## Try Again
-
-make sure `pip` is the latest version
-
-
-we've tried to create a new venv and installing certain packages with no binary flag (these packages will build from source):
-
-```bash
-#somehow need to install these stuff separately
-pip3 install wheel packaging torch==2.6.0
-#install regularly
-pip3 install -v ninja numpy tqdm datasets python-dateutil sympy==1.13.1 antlr4-python3-runtime==4.11.1 word2number Pebble timeout-decorator latex2sympy2 deepspeed==0.16.2 transformers==4.51.0 bitsandbytes
-```
-
-build our own version of `xformers`
-```bash
-# (Optional) Makes the build much faster
-pip3 install ninja
-# Set TORCH_CUDA_ARCH_LIST if running and building on different GPU types
-# (this can take dozens of minutes)
-pip3 install -v -U git+https://github.com/facebookresearch/xformers.git@main#egg=xformers
-```
-
-Navigate to llamafactory and install it there
-```bash
-cd LLaMA-Factory
-# use no deps to resolve dependency conflicts
-pip install --no-deps -e .
-```
-
-```bash
-#install without binaries
-pip3 install -v flash-attn==2.7.2.post1 --no-binary flash-attn
-```
-
 ## Minimal Dependencies
+
+Note the `~/.bashrc` file; I have used `cuda-12.3` and `python-3.10.0`. Most packages require at least `cuda-12.0`. We have manually specified the compatible versions of these packages.
 
 ```bash
 pip install tqdm packaging numpy wheel torch==2.4.0 transformers==4.49.0 datasets==3.2.0 accelerate==1.2.1 peft==0.12.0 trl==0.9.6 bitsandbytes==0.43.2 deepspeed==0.16.4 triton==3.0.0
@@ -362,5 +278,37 @@ pip install tqdm packaging numpy wheel torch==2.4.0 transformers==4.49.0 dataset
 install llamafactory
 ```bash
 cd LLaMA-Factory
-pip install -e ".[torch,metrics]"
+pip install -e ".[torch,metrics]" -v
 ```
+
+### Troubleshooting
+
+If pip install bitsandbytes doesnt work, we have to build this specific version from source.
+
+```bash
+# Clone the repo
+git clone https://github.com/bitsandbytes-foundation/bitsandbytes.git
+#go to the repo
+cd bitsandbytes
+#fetch the tag
+git fetch --all --tags
+# note sometimes the name comes with v0.43.2 sometimes they dont
+git checkout 0.43.2
+# check if right tag
+git describe --tags
+# Build with CMake, may need to use newer version of cmake
+# need cuda toolkit and nvcc too
+# need to specify which cuda architecture we wanna build for
+# the H100 is built for compute capability 90
+cmake -DCOMPUTE_BACKEND=cuda -DCMAKE_CUDA_ARCHITECTURES=90 -S . -v
+make VERBOSE=1
+#ensure you are in the bitsandbytes folder, so it can find the setup.py or pyproject.toml
+#will install the package into the current activated venv
+#we install WITHOUT DEPENDENCIES, ONLY THIS PACKAGE
+pip install -e . --no-deps -v  # `-e` for "editable" install, when developing BNB (otherwise leave that out)
+```
+
+Then install the regular packages with their versions normally.
+
+
+
