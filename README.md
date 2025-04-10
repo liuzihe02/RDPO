@@ -2,16 +2,6 @@
 
 This is a fork of the Critique Fine Tuning repo, made for initial experimentation
 
-## Installing Packages
-```bash
-#somehow we need to install these packages manually
-pip install packaging wheel torch==2.4.0
-#we use no build isolation so it can access the dependencies in our venv
-pip install -r requirements.txt --no-build-isolation
-```
-
-If the last step doesn't work, try doing `pip install -r requirements.txt --no-build-isolation`. Afterwards, follow the `LLaMA-Factory` [instructions](https://github.com/hiyouga/LLaMA-Factory) to download `LLaMA-Factory` manually.
-
 ## Notes
 
 - `LlamaFactory` is stored in the `train/` subdirectory, install it in the train subdir before running anything
@@ -323,21 +313,9 @@ Modify the `run_rdpo` in the workflow accordingly
 
 We add an extra field `reasoning_weight` to the finetuning args with default value `0.5`
 
-## CUDA Memory Issues
+## Validation Scripts
 
-### Clearing GPU Memory
-
-Sometimes running multiple experiments, memory can remain allocated in the GPU. We can clear the GPU memory in between runs
-
-```bash
-python3 -c "import torch; torch.cuda.empty_cache()"
-```
-
-### Reducing Memory Usage
-
-Decrease `per_device_train_batch_size`
-Decrease `lora_rank`
-Decrease `cutoff_len` for data
+Validation script is found in `train/validation/rdpo_validate.sh`
 
 *Meeting with Peter*
 

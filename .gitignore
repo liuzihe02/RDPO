@@ -7,20 +7,23 @@ local*
 
 # Ignore any file or directory with 'venv' in the name
 *venv*
+*venv*/
 venv/
 venv2/
 
 #ignore cache
 *.pyc
 
-# Ignore all JSON files
-*.json
-# Ignore all JSONL files
-*.jsonl
-
 # Ignore all files with 'checkpoint' and 'results' in the filename
 *checkpoint*
 *results*
+# Ignore all directories with 'checkpoint' in the name
+*checkpoint*/
+# Ignore all directories with 'result' in the name
+*result*/
+# ignore all folders with output in the name
+*output*/
+
 
 #ignore the backup folder
 .git_backup
