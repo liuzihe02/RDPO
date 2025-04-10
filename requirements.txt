@@ -1,0 +1,26 @@
+#zachs extra packages, take the dependencies from LlamaFactory github requirements
+deepspeed==0.16.2
+torch==2.4.0
+metrics
+packaging
+ninja
+flash-attn==2.7.2.post1
+bitsandbytes==0.43.2
+transformers==4.49.0
+numpy
+wheel
+
+#cft requirements
+vllm>=0.4.3 #i have adjusted this to be flexible accomodate for deepspeed
+tqdm
+datasets
+python_dateutil
+
+# math_eval
+# sympy==1.12 # old version of sympy that was incompatible
+sympy==1.13.1
+antlr4-python3-runtime==4.11.1 # ! The version needs to be compatible with sympy.
+word2number
+Pebble
+timeout-decorator
+latex2sympy2

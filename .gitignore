@@ -1,0 +1,37 @@
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+local*
+
+# Ignore any file or directory with 'venv' in the name
+*venv*
+*venv*/
+venv/
+venv2/
+
+#ignore cache
+*.pyc
+
+# Ignore all files with 'checkpoint' and 'results' in the filename
+*checkpoint*
+*results*
+# Ignore all directories with 'checkpoint' in the name
+*checkpoint*/
+# Ignore all directories with 'result' in the name
+*result*/
+# ignore all folders with output in the name
+*output*/
+
+#explicitly ignore our cft and genrm datasets as they are simply too big
+# Ignore all JSON files containing 'cft' anywhere in their name
+# need to download these using the tools/scripts provided
+*cft*.json
+*CFT*.json
+*genrm*.json
+
+#ignore the backup folder
+.git_backup
+.git_backup/
+clean/
