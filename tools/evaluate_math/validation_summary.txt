@@ -1,7 +1,0 @@
-./qwen2.5-0.5B-cft_WebInstruct-CFT-4K-checkpoint-10/math-500 2025-03-06 02:45:23 Final Accuracy: 50.0
-./qwen2.5-0.5B-cft_WebInstruct-CFT-4K-checkpoint-20/math-500 2025-03-06 02:46:26 Final Accuracy: 20.0
-./qwen2.5-0.5B-cft_WebInstruct-CFT-4K-checkpoint-30/math-500 2025-03-06 02:47:44 Final Accuracy: 40.0
-./qwen2.5-0.5B-cft_WebInstruct-CFT-4K-checkpoint-40/math-500 2025-03-06 02:49:08 Final Accuracy: 40.0
-./qwen2.5-0.5B-cft_WebInstruct-CFT-4K-checkpoint-50/math-500 2025-03-06 02:50:16 Final Accuracy: 40.0
-./qwen2.5-0.5B-cft_WebInstruct-CFT-4K-checkpoint-60/math-500 2025-03-06 02:51:34 Final Accuracy: 40.0
-./qwen2.5-0.5B-cft_WebInstruct-CFT-4K-checkpoint-62/math-500 2025-03-06 02:52:54 Final Accuracy: 40.0
