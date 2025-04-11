@@ -17,7 +17,7 @@ do_train: true
 do_eval: false
 #Fine-tuning method. Optional: freeze, lora, full
 finetuning_type: lora
-lora_rank: 2
+lora_rank: 1
 lora_target: all
 deepspeed: examples/deepspeed/ds_z2_offload_config.json # choices: [ds_z0_config.json, ds_z2_config.json, ds_z3_config.json]
 pref_beta: 0.1
@@ -35,7 +35,7 @@ dataset: genrm_rdpo
 # though i think this is just to format the dataset questions?
 template: qwen
 #this can significantly affect cuda memory use; reduce this if memory problems too much
-cutoff_len: 128
+cutoff_len: 512
 #subset of entire training set, for experimentation
 # only use positive numbers here
 # set it to the size of the dataset
@@ -52,7 +52,7 @@ overwrite_output_dir: true
 save_only_model: true
 
 ### train
-per_device_train_batch_size: 4 #may need to reduce batch size since reasoning adds more data
+per_device_train_batch_size: 2 #may need to reduce batch size since reasoning adds more data
 #stores these gradients instead of immediately updating after every batch
 #best to keep the same or increase
 gradient_accumulation_steps: 8

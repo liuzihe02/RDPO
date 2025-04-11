@@ -1,5 +1,6 @@
-set -ex
+set -e
 
+#these paths are all relative to the current working directory
 PROMPT_TYPE="qwen25-math-cot"
 MODEL_NAME_OR_PATH=$1
 OUTPUT_DIR=$2
@@ -9,17 +10,23 @@ SPLIT="test"
 NUM_TEST_SAMPLE=$4
 
 mkdir -p $OUTPUT_DIR
-cd ../../tools/evaluate_math
+
+# Record cur directory, before changing to math folder
+CURRENT_DIR=$(pwd)
+
+#cd to the evaluate_math folder
+cd ../../../tools/evaluate_math
 
 DATA_NAME="math-500"
 TOKENIZERS_PARALLELISM=false \
 #the max tokens is an important parameter
 #we also added use_safetensors
+# need to use absolute paths here as we've changed directory
 python3 -u math_eval.py \
-    --model_name_or_path ${MODEL_NAME_OR_PATH} \
+    --model_name_or_path ${CURRENT_DIR}/${MODEL_NAME_OR_PATH} \
     --data_name ${DATA_NAME} \
-    --output_dir ${OUTPUT_DIR} \
-    --summary_path ${SUMMARY_PATH} \
+    --output_dir ${CURRENT_DIR}/${OUTPUT_DIR}  \
+    --summary_path ${CURRENT_DIR}/${SUMMARY_PATH}\
     --split ${SPLIT} \
     --prompt_type ${PROMPT_TYPE} \
     --num_test_sample ${NUM_TEST_SAMPLE} \

@@ -1,17 +1,16 @@
 #!/bin/bash
-set -ex
+set -e
+
+#this file does validation on the math500 dataset
 
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 
 #this directory contains many subdirectories. Each subdirectory is a checkpoint directory
-#model_dir="../LLaMA-Factory/output_models/qwen2.5-0.5b-genrm_dpo-2000"
-model_dir="/home/flowingpurplecrane/RDPO/train/LLaMA-Factory/output_models/qwen2.5-0.5b-genrm_dpo-2000"
-#we will create a results directory here.
-output_dir="/home/flowingpurplecrane/RDPO/train/validation"
+model_dir="../../LLaMA-Factory/output_models/train-qwen2.5-0.5b-genrm-dpo"
+#we will create a results directory in the current folder
+output_dir="./"
 #number of samples to use for validation
 num_samples=10
-
-
 
 #get the model name
 model_name=$(basename "$model_dir")
