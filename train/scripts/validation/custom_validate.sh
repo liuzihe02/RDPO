@@ -6,7 +6,7 @@ set -e
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 
 #this directory contains many subdirectories. Each subdirectory is a checkpoint directory
-model_dir="../../LLaMA-Factory/output_models/train-qwen2.5-0.5b-genrm-dpo"
+model_dir="../../LLaMA-Factory/output_models/train-qwen2.5-0.5b-genrm-sft-veri"
 #we will create a results directory in the current folder
 output_dir="./"
 #number of samples to use for validation
