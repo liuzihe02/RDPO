@@ -313,6 +313,12 @@ Modify the `run_rdpo` in the workflow accordingly
 
 We add an extra field `reasoning_weight` to the finetuning args with default value `0.5`
 
+## Training Scripts
+
+Make sure all the scripts have the same settings. We manually verify this because its just easier.
+
+TODO: you probably need to double check all the tokens; what goes in and out of the LLM, before you finally confirm the results
+
 ## Validation Scripts
 
 Validation script is found in `train/validation/rdpo_validate.sh`

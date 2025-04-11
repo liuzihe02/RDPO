@@ -3,6 +3,7 @@
 import os
 import re
 import matplotlib.pyplot as plt
+from datetime import datetime
 
 
 def plot_validation_results(validation_dir):
@@ -13,11 +14,13 @@ def plot_validation_results(validation_dir):
     for model_folder in os.listdir(validation_dir):
         model_path = os.path.join(validation_dir, model_folder)
         if not os.path.isdir(model_path):
+            print(f"'{model_path}' is not found")
             continue
 
         # Path to the validation summary file
         summary_file = os.path.join(model_path, "validation_summary.txt")
         if not os.path.exists(summary_file):
+            print(f"'{summary_file}' is not found")
             continue
 
         # Read the summary file
@@ -48,12 +51,17 @@ def plot_validation_results(validation_dir):
         checkpoints, accuracies = zip(*results)
         plt.plot(checkpoints, accuracies, marker="o", label=model_name)
 
+    # Get current time
+    current_time = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+
     plt.xlabel("Checkpoint")
     plt.ylabel("Accuracy (%)")
     plt.title("Validation Accuracy by Checkpoint")
+
     plt.grid(True)
     plt.legend()
-    plt.savefig("validation_results.png")
+    # add current time to filename
+    plt.savefig(f"validation_results - {current_time}.png")
 
 
 if __name__ == "__main__":

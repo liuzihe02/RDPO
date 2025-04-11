@@ -10,21 +10,22 @@ trust_remote_code: true
 #what kind of training
 # still provide dpo here even if you use rdpo
 stage: dpo
-#if you use dpo, need to specify if RDPO or not!
+#IMPORTANT if you use dpo, need to specify if RDPO or not! If dont specify, just normal DPO
 rdpo: true
 #true for training, false for eval
 do_train: true
 do_eval: false
 #Fine-tuning method. Optional: freeze, lora, full
 finetuning_type: lora
-lora_rank: 1
+lora_rank: 2
 lora_target: all
 deepspeed: examples/deepspeed/ds_z2_offload_config.json # choices: [ds_z0_config.json, ds_z2_config.json, ds_z3_config.json]
 pref_beta: 0.1
 pref_loss: sigmoid # choices: [sigmoid (dpo), orpo, simpo]
 
 #the hyperparam for our RDPO loss
-reasoning_weight: 0.6
+# may need some investigation here to see the tuning for this
+reasoning_weight: 0.5
 
 ### dataset
 
@@ -35,20 +36,21 @@ dataset: genrm_rdpo
 # though i think this is just to format the dataset questions?
 template: qwen
 #this can significantly affect cuda memory use; reduce this if memory problems too much
-cutoff_len: 512
+# for rdpo, text is doubled so memory issues more prevalent
+cutoff_len: 128
 #subset of entire training set, for experimentation
 # only use positive numbers here
 # set it to the size of the dataset
-max_samples: 100
+max_samples: 1000
 overwrite_cache: true
 preprocessing_num_workers: 16
 
 ### output
 output_dir: output_models/train-qwen2.5-0.5b-genrm-rdpo
 logging_steps: 1
-save_steps: 5
+save_steps: 3
 plot_loss: true
-overwrite_output_dir: true
+overwrite_output_dir: false
 save_only_model: true
 
 ### train

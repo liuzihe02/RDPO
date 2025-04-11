@@ -15,7 +15,7 @@ export MASTER_PORT
 #Configures PyTorch's CUDA memory allocation to use expandable segments
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-MODEL_NAME="rdpo"
+MODEL_NAME="sft-no_veri"
 export WANDB_RUN_NAME=$MODEL_NAME
 
 # Get config file path
