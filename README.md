@@ -323,6 +323,8 @@ TODO: you probably need to double check all the tokens; what goes in and out of 
 
 Validation script is found in `train/validation/rdpo_validate.sh`
 
+Note that the `solution` and `gt_cot` are the same, `answer` and `gt` should be the same (except for some formatting differences), for the actual response data in `checkpoint`. In the original `math-500` dataset, there is only `problem`, `solution` and `answer`.
+
 *Meeting with Peter*
 
 setup of rdpo, how messages are structured

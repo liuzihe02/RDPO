@@ -14,7 +14,7 @@ def plot_validation_results(validation_dir):
     for model_folder in os.listdir(validation_dir):
         model_path = os.path.join(validation_dir, model_folder)
         if not os.path.isdir(model_path):
-            print(f"'{model_path}' is not found")
+            print(f"'{model_path}' is not a directory")
             continue
 
         # Path to the validation summary file

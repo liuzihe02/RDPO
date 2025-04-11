@@ -1,4 +1,0 @@
-/home/flowingpurplecrane/RDPO/train/scripts/validation/.//results_train-qwen2.5-0.5b-genrm-dpo/checkpoint-12/math-500 2025-04-11 23:10:28 Final Accuracy: 50.0
-/home/flowingpurplecrane/RDPO/train/scripts/validation/.//results_train-qwen2.5-0.5b-genrm-dpo/checkpoint-3/math-500 2025-04-11 23:11:43 Final Accuracy: 30.0
-/home/flowingpurplecrane/RDPO/train/scripts/validation/.//results_train-qwen2.5-0.5b-genrm-dpo/checkpoint-6/math-500 2025-04-11 23:13:10 Final Accuracy: 50.0
-/home/flowingpurplecrane/RDPO/train/scripts/validation/.//results_train-qwen2.5-0.5b-genrm-dpo/checkpoint-9/math-500 2025-04-11 23:14:21 Final Accuracy: 40.0
