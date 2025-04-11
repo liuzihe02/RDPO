@@ -14,16 +14,6 @@ venv2/
 #ignore cache
 *.pyc
 
-# Ignore all files with 'checkpoint' and 'results' in the filename
-*checkpoint*
-*results*
-# Ignore all directories with 'checkpoint' in the name
-*checkpoint*/
-# Ignore all directories with 'result' in the name
-*result*/
-# ignore all folders with output in the name
-*output*/
-
 #explicitly ignore our cft and genrm datasets as they are simply too big
 # Ignore all JSON files containing 'cft' anywhere in their name
 # need to download these using the tools/scripts provided
@@ -35,3 +25,31 @@ venv2/
 .git_backup
 .git_backup/
 clean/
+
+# Ignore all FILES in checkpoint directories
+# this is NOT THE SAME as ignoring the entire directory
+# this is finding a directory and ignoring FILES inside the directory
+# this allows us to ignore stuff in a directory EXCEPT for a few files
+*checkpoint*/**/*
+
+# But don't ignore these specific files
+!*checkpoint*/**/*test_qwen*.json
+
+# ignore any FILES inside any directory with output in the name
+*output*/**/*
+
+# But don't ignore these specific files
+# keep any png files
+!*output*/**/*.png
+# keep all the logs and states
+!*output*/**/*log*
+!*output*/**/*state*
+
+# #ignore all files with result in the name
+# *result*
+# # EXCEPTION: it is an image or jpeg, we can upload this
+# !*results*.png
+# !*results*.jpg
+# # Ignore all directories with 'result' in the name
+# *result*/
+
