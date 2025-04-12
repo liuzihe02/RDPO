@@ -3,7 +3,7 @@ set -e
 
 #this file does validation on the math500 dataset
 
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+export CUDA_VISIBLE_DEVICES=1
 
 #this directory contains many subdirectories. Each subdirectory is a checkpoint directory
 model_dir="../../LLaMA-Factory/output_models/train-qwen2.5-0.5b-genrm-sft-no_veri"
