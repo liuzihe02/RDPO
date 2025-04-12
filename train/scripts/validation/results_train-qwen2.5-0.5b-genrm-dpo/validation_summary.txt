@@ -1,4 +1,0 @@
-/home/zachliu/RDPO/train/scripts/validation/.//results_train-qwen2.5-0.5b-genrm-dpo/checkpoint-10/math-500 2025-04-12 02:18:04 Final Accuracy: 40.0
-/home/zachliu/RDPO/train/scripts/validation/.//results_train-qwen2.5-0.5b-genrm-dpo/checkpoint-3/math-500 2025-04-12 02:19:07 Final Accuracy: 40.0
-/home/zachliu/RDPO/train/scripts/validation/.//results_train-qwen2.5-0.5b-genrm-dpo/checkpoint-6/math-500 2025-04-12 02:20:11 Final Accuracy: 30.0
-/home/zachliu/RDPO/train/scripts/validation/.//results_train-qwen2.5-0.5b-genrm-dpo/checkpoint-9/math-500 2025-04-12 02:21:04 Final Accuracy: 50.0

@@ -1,4 +1,0 @@
-/home/zachliu/RDPO/train/scripts/validation/.//results_train-qwen2.5-0.5b-genrm-sft-veri/checkpoint-10/math-500 2025-04-12 02:28:13 Final Accuracy: 50.0
-/home/zachliu/RDPO/train/scripts/validation/.//results_train-qwen2.5-0.5b-genrm-sft-veri/checkpoint-3/math-500 2025-04-12 02:29:01 Final Accuracy: 30.0
-/home/zachliu/RDPO/train/scripts/validation/.//results_train-qwen2.5-0.5b-genrm-sft-veri/checkpoint-6/math-500 2025-04-12 02:30:01 Final Accuracy: 30.0
-/home/zachliu/RDPO/train/scripts/validation/.//results_train-qwen2.5-0.5b-genrm-sft-veri/checkpoint-9/math-500 2025-04-12 02:31:08 Final Accuracy: 40.0
