@@ -17,7 +17,7 @@ This is a fork of the Critique Fine Tuning repo, made for initial experimentatio
   - If size of training dataset too big, also memory issues
 - For debugging, use `logger.info_rank0(f"zihe logger after process {dataset_module['train_dataset']}")` instead of print. the `logger` object should already have been defined
 
-## Data and RDPO
+## Data
 
 Structure of RDPO data:
 
@@ -69,6 +69,31 @@ def create_rdpo_dataset(master_df):
 
     return rdpo_data
 ```
+
+I uploaded [this dataset](https://github.com/gen-agent/genrm-data/tree/main) from [this paper](https://sites.google.com/view/generative-reward-models) "Generative Verifiers", on [HuggingFace](https://huggingface.co/datasets/flowingpurplecrane/genrm) for easier use.
+
+### Generative Verifiers Data
+
+We explain how the training dataset was created, detailed in Appendix A of the paper.
+
+- Dataset Split
+  - They follow the train/test split from GSM8K: 1.3K problems test set, 128 problems validation set, 7.2K problems train set
+- Solution Generation
+  - For each problem in trainset, generate 50 candidate solutions
+  - Randomly sample 16 correct and 16 incorrect solutions per problem
+- Verification Rationale Generation
+  - Use Gemini 1.0 Pro to generate verification rationales (aided by a correct reference solution)
+
+### Exploratory Data Analysis
+
+After some quick EDA, we've indeed checked that all data is only GSM8K math problems only. No word sort or last letter concat problems as in the paper. This gives us around 500K datapoints.
+
+> Note that for each `question_id` (actual GSM8K question), there may be duplicate `model_output_id` (candidate solution to the math question). However, all the `targets` are unique; the verification rationale is unique here.
+
+> **Inconsistent verification rationales:** Around 1k out of the 500k have inconsistent verification rationales; these verifications are wrong! The model solution said "The answer is 17.", and the ground truth target is "17", but this is marked as a wrong solution, when it really is correct. Hence the verification is inconsistent here. *We filter these examples away before starting.*
+
+We call the *solution* as the full text containing COT and the final numerical *answer*.
+
 
 ## Experiments
 
