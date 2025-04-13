@@ -90,7 +90,9 @@ After some quick EDA, we've indeed checked that all data is only GSM8K math prob
 
 > Note that for each `question_id` (actual GSM8K question), there may be duplicate `model_output_id` (candidate solution to the math question). However, all the `targets` are unique; the verification rationale is unique here.
 
-> **Inconsistent verification rationales:** Around 1k out of the 500k have inconsistent verification rationales; these verifications are wrong! The model solution said "The answer is 17.", and the ground truth target is "17", but this is marked as a wrong solution, when it really is correct. Hence the verification is inconsistent here. *We filter these examples away before starting.*
+> *We assume verifications are consistent.* A few of rationales are inconsistent: The model solution said "The answer is 17.", and the ground truth target is "17", but this is marked as a wrong solution, when it really is correct. Hence the verification is inconsistent here. 
+> 
+> For the most part, the rationales are consistent. We are unable to verify exactly which solutions match the ground truth; because extracting the answer from the solution (using regex) to match the format of the ground truth for comparison is tricky
 
 We call the *solution* as the full text containing COT and the final numerical *answer*.
 

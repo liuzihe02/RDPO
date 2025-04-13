@@ -111,7 +111,9 @@ def check_verification(dataset):
     - If is_correct(targets) is "Yes", then "The answer is X" in the model output solution matches target value
     - If is_correct(targets) is "No", then "The answer is X" in model output solution does NOT match target value
 
-    basically check if the verification rationales are consistent with the ground truth vs model solutions
+    basically check if the verification rationales are consistent with the ground truth vs model solutions.
+
+    CONCLUSION: FOR THE MOST PART YES IT IS
 
     exploratory data analysis
     """
@@ -125,11 +127,16 @@ def check_verification(dataset):
 
         # Extract the answer from inputs text
         solution = extract_solution(item["inputs"])
+        # this is the raw string extracted
         answer = extract_answer(solution)
         if answer is None:
             raise ValueError(
                 f"Answer does not exist! \n Inputs (raw string): {repr(item['inputs'])}, \n Target: {repr(item['target'])}, \n Marked: {correct}, \n question_id: {item['question_id']}, \n model_output_id: {item['model_output_id']}, \n Extracted Answer: {answer}, \n Extracted Solution: {repr(solution)}"
             )
+
+        # post processing to account for $ signs comma etc. convert to float adn back to string.
+        # this post processing is not very good
+        answer = answer.replace("$", "").replace(",", "").replace(" ", "").strip()
 
         target = str(item.get("target", "")).strip()
 
@@ -140,7 +147,7 @@ def check_verification(dataset):
             inconsistencies += 1
             if inconsistencies <= 10:
                 print(
-                    f"Inconsistency! Extracted Answer: '{answer}', Target: '{target}', Marked: {correct}, Extracted Solution: '{extract_solution(item['inputs'])}', question_id: {item['question_id']}, model_output_id: {item['model_output_id']}"
+                    f"\nInconsistency! Extracted Answer: '{answer}', Target: '{target}', Marked: {correct}, Extracted Solution: '{extract_solution(item['inputs'])}', question_id: {item['question_id']}, model_output_id: {item['model_output_id']}"
                 )
 
     if inconsistencies == 0:
@@ -173,23 +180,24 @@ def extract_solution(inputs_text):
 
 
 def extract_answer(solution_text):
-    """Extract the numerical final answer from a solution text. this will be a string, even though numerical"""
+    """Extract the numerical final answer from a solution text. this will be a substring, even though numerical in nature. No modifications, extracted as is"""
 
     # List of regex patterns to try, in order of preference
     patterns = [
-        # Pattern 1: "Answer is X" or "The answer is X"
-        r"answer(?:\s+is)?[:,]?\s*(\d+)",
+        # Pattern 1: "Answer is X" with spaces, commas, and decimals in numbers
+        r"answer(?:\s+is)?[:,]?\s*\$?([\d\s,]+(?:\.\d+)?)",
         # Pattern 2: "The answer is X" with various endings
         r"the answer is[:,]? (.+?)(?:\.|\n|\\n|$)",
-        # Pattern 3: Any numerical answer after "answer"
-        r"answer.*?(\d+)",
+        # Pattern 3: Full numerical answers after "answer"
+        r"answer.*?[^a-zA-Z0-9](\$?[\d\s,]+(?:\.\d+)?)",
         # Pattern 4: Any word or number after "The answer is"
-        r"the\s+answer(?:\s+is)?[:,]?\s*(\S+)",
+        r"the\s+answer(?:\s+is)?[:,]?\s*(\S+(?:\s+\d+)*)",
         # Pattern 5: Everything between "answer is" and a period
         r"answer\s+is\s+([^\.]+)",
-        # Pattern 6: Special format like "THE ANSWER IS 588"
-        r"the answer is (\d+)",
+        # Pattern 6: Last resort - any digits with possible spaces
+        r"answer.*?(\d[\d\s,\.]*)",
     ]
+
     # Try each pattern in sequence
     for i, pattern in enumerate(patterns):
         # ignore case of letters
@@ -546,15 +554,15 @@ def main():
     # check_model_id_uniqueness(train_dataset)
     # print()
 
-    # Check if all inputs have the expected format for math problems
-    # basically check if all the questions are really math questions; no grammar or coding questions
-    # YES: I HAVE INDEED VERIFIES THIS IS GSM8K DATA ONLY no last letter or word sort problems
-    check_inputs_format(train_dataset)
-    print()
+    # # Check if all inputs have the expected format for math problems
+    # # basically check if all the questions are really math questions; no grammar or coding questions
+    # # YES: I HAVE INDEED VERIFIES THIS IS GSM8K DATA ONLY no last letter or word sort problems
+    # check_inputs_format(train_dataset)
+    # print()
 
-    # check all our verifications are consistent - ANSWERS in the solution (model output solution) and groundtruth answers labels matches how the verification rationales labels them
-    check_verification(train_dataset)
-    print()
+    # # check all our verifications are consistent - ANSWERS in the solution (model output solution) and groundtruth answers labels matches how the verification rationales labels them
+    # check_verification(train_dataset)
+    # print()
 
     # start processing the dataset
 
