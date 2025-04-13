@@ -11,6 +11,7 @@ from datasets import load_dataset, Dataset
 import random
 import pandas as pd
 from tqdm import tqdm
+import numpy as np
 
 random.seed(0)
 
@@ -363,32 +364,47 @@ def process_master_dataset(dataset, num_samples):
     # Create valid pairs ensuring each model_output_id is used only once per question
     # one pair is a single question, correct-incorrect solution
     # questions may be duplicates, but each solution is unique!
+
+    # FASTER APPROACH: Group data once, then create pairs
+    print("Creating pairs efficiently...")
+    # Group by question_id and correct status to avoid repeated filtering
+    grouped = df.groupby(["question_id", "correct"])
+
+    # Create lookup dictionary for faster access. this lookup dict is just (qid,correct_status):[list of model output ids]
+    output_map = {}
+    for (qid, correct_status), group in grouped:
+        if qid in eligible_questions:
+            if qid not in output_map:
+                output_map[qid] = {}
+            output_map[(qid, correct_status)] = group["model_output_id"].values
+
+    # Create pairs efficiently without repetition
     valid_pairs = []
-
     for qid in tqdm(eligible_questions, desc="Creating valid pairs"):
-        # Get correct and incorrect model_output_ids for this question
-        correct_outputs = df[(df["question_id"] == qid) & (df["correct"] == "Yes")][
-            "model_output_id"
-        ].tolist()
-        incorrect_outputs = df[(df["question_id"] == qid) & (df["correct"] == "No")][
-            "model_output_id"
-        ].tolist()
+        # get all the correct outputs for this questions
+        correct_outputs = list(
+            output_map[(qid, "Yes")]
+        )  # Convert to list for random sampling
+        incorrect_outputs = list(
+            output_map[(qid, "No")]
+        )  # Convert to list for random sampling
 
-        # # you can Shuffle to get different combinations each time
-        # random.shuffle(correct_outputs)
-        # random.shuffle(incorrect_outputs)
+        # # Use random sampling without replacement
+        # np.random.shuffle(correct_outputs)
+        # np.random.shuffle(incorrect_outputs)
+
+        # Take the minimum number of pairs possible
+        qn_pairs = min(len(correct_outputs), len(incorrect_outputs))
+
+        # Use the first qn_pairs elements from each shuffled list
+        for i in range(qn_pairs):
+            valid_pairs.append((qid, correct_outputs[i], incorrect_outputs[i]))
 
         # # Add all possible pairs
         # # WE DONT WANT THIS - SOLUTIONS WILL BE REPEATED THIS WAY
         # for correct_id in correct_outputs:
         #     for incorrect_id in incorrect_outputs:
         #         valid_pairs.append((qid, correct_id, incorrect_id))
-
-        # Create pairs using the minimum length approach
-        # just index i by i until the shorter one is reached
-        qn_pairs = min(len(correct_outputs), len(incorrect_outputs))
-        for i in range(qn_pairs):
-            valid_pairs.append((qid, correct_outputs[i], incorrect_outputs[i]))
 
     print(f"Created {len(valid_pairs)} valid pairs")
     # Sample pairs if needed
@@ -404,6 +420,7 @@ def process_master_dataset(dataset, num_samples):
     for qid, correct_output_id, incorrect_output_id in tqdm(
         sampled_pairs, desc="Building dataset"
     ):
+        # so its always correct then incorrect
         # Get and add correct solution, just take the first one (there may be duplicate qid-outputid due to multiple verification rationales for one qid-outputid)
         correct_row = df[
             (df["question_id"] == qid) & (df["model_output_id"] == correct_output_id)
@@ -423,6 +440,12 @@ def process_master_dataset(dataset, num_samples):
         f"Final dataset: {len(master_df)} entries ({len(sampled_pairs)} question pairs)"
     )
 
+    # Ensure we have an even number of rows
+    if len(master_df) % 2 != 0:
+        print(
+            f"Warning: Master dataset has odd number of rows ({len(master_df)}). Dropping last row."
+        )
+
     return master_df
 
 
@@ -438,26 +461,25 @@ save it as data_genrm_dpo.json
 
 
 def create_dpo_dataset(master_df):
-    """Create the DPO dataset from the master dataset."""
+    """Create the DPO dataset from the master dataset.
+    Handles the correct-incorrect structure where rows alternate between correct and incorrect solutions.
+    """
     print("Creating DPO dataset...")
 
-    # Since master_df already contains exactly one correct and one incorrect per question,
-    # we can process it more efficiently
     dpo_data = []
+    # The master_df has alternating correct/incorrect solutions
+    # Process in pairs (every 2 rows should form a pair)
 
-    # Get all unique question IDs
-    unique_questions = master_df["question_id"].unique()
+    # Step through the dataframe in pairs
+    for i in range(0, len(master_df), 2):
+        # Get current pair of rows
+        correct_row = master_df.iloc[i]
+        incorrect_row = master_df.iloc[i + 1]
 
-    for qid in tqdm(unique_questions, desc="Creating DPO entries"):
-        # Get the pair of rows for this question
-        question_rows = master_df[master_df["question_id"] == qid]
+        # Ensure we have one correct and one incorrect solution
+        assert correct_row["correct"] == "Yes" and incorrect_row["correct"] == "No"
 
-        # Extract correct and incorrect rows
-        # just take the first one that you find a correct and first one that you find incorrect
-        # since there can only be one of this per question
-        correct_row = question_rows[question_rows["correct"] == "Yes"].iloc[0]
-        incorrect_row = question_rows[question_rows["correct"] == "No"].iloc[0]
-
+        # Create the DPO entry
         dpo_entry = {
             "question": correct_row["instruction"] + correct_row["problem"],
             "chosen": correct_row["solution"],
@@ -466,6 +488,7 @@ def create_dpo_dataset(master_df):
 
         dpo_data.append(dpo_entry)
 
+    print(f"Created {len(dpo_data)} DPO entries")
     return dpo_data
 
 
@@ -483,20 +506,22 @@ save it as data_genrm_rdpo.json
 
 def create_rdpo_dataset(master_df):
     """Create the RDPO dataset which is similar to DPO but includes the verification data.
-    For each question, the 'chosen' and 'rejected' fields are built by concatenating
-    the solution with the verification rationale."""
+    Handles the correct-incorrect structure where rows alternate between correct and incorrect solutions.
+    """
     print("Creating RDPO dataset...")
 
     rdpo_data = []
-    unique_questions = master_df["question_id"].unique()
 
-    # for each question
-    for qid in tqdm(unique_questions, desc="Creating RDPO entries"):
-        question_rows = master_df[master_df["question_id"] == qid]
-        assert len(question_rows) == 2
-        correct_row = question_rows[question_rows["correct"] == "Yes"].iloc[0]
-        incorrect_row = question_rows[question_rows["correct"] == "No"].iloc[0]
+    # Step through the dataframe in pairs
+    for i in range(0, len(master_df), 2):
+        # Get current pair of rows
+        correct_row = master_df.iloc[i]
+        incorrect_row = master_df.iloc[i + 1]
 
+        # Ensure we have one correct and one incorrect solution
+        assert correct_row["correct"] == "Yes" and incorrect_row["correct"] == "No"
+
+        # Create the RDPO entry
         rdpo_entry = {
             "question": """Solve the math problems and provide step-by-step solutions, ending with \"The answer is [Insert Final Answer Here]\"."""
             + correct_row["problem"],
@@ -511,6 +536,7 @@ def create_rdpo_dataset(master_df):
             + "\n\nHere's why this solution is incorrect and not preferred: "
             + incorrect_row["targets"],
         }
+
         rdpo_data.append(rdpo_entry)
 
     print(f"Created {len(rdpo_data)} RDPO entries")
