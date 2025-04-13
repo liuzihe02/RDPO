@@ -286,10 +286,6 @@ def process_master_dataset(dataset, num_samples):
     df["correct"] = df["targets"].progress_apply(extract_verification)
     df["problem"] = df["inputs"].progress_apply(extract_problem)
     df["solution"] = df["inputs"].progress_apply(extract_solution)
-    # instruction is fixed. this instruction is for non-verification training
-    df["instruction"] = (
-        """Solve the math problems and provide step-by-step solutions, ending with \"The answer is [Insert Final Answer Here]\"."""
-    )
 
     # Keep only necessary columns
     df = df[
@@ -297,7 +293,6 @@ def process_master_dataset(dataset, num_samples):
             "question_id",
             "model_output_id",
             "inputs",
-            "instruction",
             # the math problem
             "problem",
             # the output solution
@@ -476,12 +471,13 @@ def create_dpo_dataset(master_df):
         correct_row = master_df.iloc[i]
         incorrect_row = master_df.iloc[i + 1]
 
-        # Ensure we have one correct and one incorrect solution
+        # Ensure we have one correct and one incorrect solution in right order
         assert correct_row["correct"] == "Yes" and incorrect_row["correct"] == "No"
 
         # Create the DPO entry
         dpo_entry = {
-            "question": correct_row["instruction"] + correct_row["problem"],
+            "question": """Solve the math problems and provide step-by-step solutions, ending with \"The answer is [Insert Final Answer Here]\"."""
+            + correct_row["problem"],
             "chosen": correct_row["solution"],
             "rejected": incorrect_row["solution"],
         }
@@ -518,7 +514,7 @@ def create_rdpo_dataset(master_df):
         correct_row = master_df.iloc[i]
         incorrect_row = master_df.iloc[i + 1]
 
-        # Ensure we have one correct and one incorrect solution
+        # Ensure we have one correct and one incorrect solution in the right order
         assert correct_row["correct"] == "Yes" and incorrect_row["correct"] == "No"
 
         # Create the RDPO entry
@@ -527,13 +523,13 @@ def create_rdpo_dataset(master_df):
             + correct_row["problem"],
             "chosen": correct_row["solution"],
             "rejected": incorrect_row["solution"],
-            "reasoning": "\nThis is a correct solution and preferred: "
+            "reasoning": """\nThis is a correct solution and preferred: """
             + correct_row["solution"]
-            + " \n\nHere's why this solution is correct and preferred: "
+            + """ \n\nHere's why this solution is correct and preferred: """
             + correct_row["targets"]
-            + "\n\nThis is an incorrect solution and not preferred: "
+            + """\n\nThis is an incorrect solution and not preferred: """
             + incorrect_row["solution"]
-            + "\n\nHere's why this solution is incorrect and not preferred: "
+            + """\n\nHere's why this solution is incorrect and not preferred: """
             + incorrect_row["targets"],
         }
 
@@ -563,7 +559,7 @@ def create_sft_no_veri_dataset(master_df):
     # Create the dataset entries directly
     sft_data = [
         {
-            "instruction": row["instruction"],
+            "instruction": """Solve the math problems and provide step-by-step solutions, ending with \"The answer is [Insert Final Answer Here]\".""",
             "input": row["problem"],
             "output": row["solution"],
         }
@@ -596,9 +592,12 @@ def create_sft_veri_dataset(master_df):
         {
             # for verification stuff, the instruction is a little different
             "instruction": """Solve the math problems and provide step-by-step solutions, ending with \"The answer is [Insert Final Answer Here]\".\nWhen asked \"Verification: Is the answer correct (Yes/No)?\", respond with \" Yes\" or \" No\" based on the answer's correctness.\nWhen asked \"Verification: Let's verify step by step.\", verify every step of the solution and conclude with \"Verification: Is the answer correct (Yes/No)?\" followed by \" Yes\" or \" No\".""",
-            "input": row["problem"],
+            # change the input a little here, use """ strings where you can
+            "input": row["problem"]
+            + """\nBesides providing your solution and answer, also do"""
+            + """ \"Verification: Let's verify step by step.\" """,
             "output": row["solution"]
-            + "\nVerification: Let's verify step by step.\n"
+            + """\nVerification: Let's verify step by step.\n"""
             + row["targets"],
         }
         for _, row in correct_df.iterrows()
