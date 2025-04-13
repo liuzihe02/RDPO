@@ -247,11 +247,20 @@ Data processing for all files
 3. Create a "solution" string column, which is found between "\nA:" (inclusive) and "\nVerification" (exclusive)
 4. Sample a subset of this dataset using the cli arguments
 
-# from all the unique questions, sample a subset of unique questions
-# for each question, select a correct output and an incorrect output
-# double check for each question there is EXACTLY ONE correct and one incorrect output, and that all questions are unique
-#so the first row is question 1 correct solution/answer
-#second row is question 1 incorrect solution/answer
+1. First filter data for questions such that both correct and incorrect solutions exist
+2. Arrange them into pairs of correct and incorrect solutions
+3. Then sample `num_samples` amount of `correct-incorrect` solutions, to form `master_df`
+   
+The master df will always be of the form:
+```
+qn1-output1-correct
+qn1-output3-incorrect
+qn1-output5-correct
+qn1-output6-incorrect
+qn2-output1-correct
+qn2-output3-incorrect
+...
+```
 
 Save this master dataset as data_genrm_master.json
 """
@@ -276,7 +285,7 @@ def process_master_dataset(dataset, num_samples):
     df["correct"] = df["targets"].progress_apply(extract_verification)
     df["problem"] = df["inputs"].progress_apply(extract_problem)
     df["solution"] = df["inputs"].progress_apply(extract_solution)
-    # instruction is fixed. this insturction is for non-verification training
+    # instruction is fixed. this instruction is for non-verification training
     df["instruction"] = (
         """Solve the math problems and provide step-by-step solutions, ending with \"The answer is [Insert Final Answer Here]\"."""
     )
@@ -313,54 +322,105 @@ def process_master_dataset(dataset, num_samples):
     # First find all questions that have both correct and incorrect solutions
     print("Finding questions with both correct and incorrect solutions...")
 
-    # Group by question_id and count occurrences of Yes and No
-    question_counts = (
-        df.groupby(["question_id", "correct"]).size().unstack(fill_value=0)
-    )
+    # Group by question_id and correct to count occurrences
+    # This creates a Series with MultiIndex (question_id, correct) that contains the count of each combination
+    # For example: (123, "Yes"): 2, (123, "No"): 1, (456, "Yes"): 3, etc.
+    question_counts = df.groupby(["question_id", "correct"]).size()
+
+    # unstack() pivots the 'correct' level of the MultiIndex to become columns
+    # This transforms the Series into a DataFrame with:
+    # - question_id as the index (rows)
+    # - correct values ("Yes", "No") as the columns
+    # - counts as the values
+    # For example:
+    #   question_id | Yes | No
+    #   -----------|-----|----
+    #   123        | 2   | 1
+    #   456        | 3   | NaN  (if there are no "No" entries for question 456)
+    # The fill_value=0 replaces missing values that occur during unstacking with 0
+    question_counts = question_counts.unstack(fill_value=0)
+
+    # Even with fill_value in unstack, some NaN values might still exist if a column
+    # is entirely missing (though unlikely in this case)
+    # fillna(0) ensures any remaining NaN values are replaced with 0
+    question_counts = question_counts.fillna(0)
 
     # Filter for questions that have at least one 'Yes' and one 'No'
     eligible_questions = question_counts[
         (question_counts["Yes"] > 0) & (question_counts["No"] > 0)
     ].index.tolist()
 
+    # Calculate and print stats
+    total_questions = len(df["question_id"].unique())
+    ineligible_questions = total_questions - len(eligible_questions)
+
+    print(f"Total unique questions: {total_questions}")
     print(
-        f"Found {len(eligible_questions)} questions with both correct and incorrect solutions"
+        f"Eligible questions (with both correct and incorrect solutions existing): {len(eligible_questions)}"
     )
+    print(f"Ineligible questions: {ineligible_questions}")
 
-    # Sample from eligible questions if needed, up till num samples
-    if num_samples and num_samples < len(eligible_questions):
-        sampled_questions = random.sample(eligible_questions, num_samples)
-        print(
-            f"Sampled {num_samples} questions from {len(eligible_questions)} eligible questions"
-        )
+    # Create valid pairs ensuring each model_output_id is used only once per question
+    # one pair is a single question, correct-incorrect solution
+    # questions may be duplicates, but each solution is unique!
+    valid_pairs = []
+
+    for qid in tqdm(eligible_questions, desc="Creating valid pairs"):
+        # Get correct and incorrect model_output_ids for this question
+        correct_outputs = df[(df["question_id"] == qid) & (df["correct"] == "Yes")][
+            "model_output_id"
+        ].tolist()
+        incorrect_outputs = df[(df["question_id"] == qid) & (df["correct"] == "No")][
+            "model_output_id"
+        ].tolist()
+
+        # # you can Shuffle to get different combinations each time
+        # random.shuffle(correct_outputs)
+        # random.shuffle(incorrect_outputs)
+
+        # # Add all possible pairs
+        # # WE DONT WANT THIS - SOLUTIONS WILL BE REPEATED THIS WAY
+        # for correct_id in correct_outputs:
+        #     for incorrect_id in incorrect_outputs:
+        #         valid_pairs.append((qid, correct_id, incorrect_id))
+
+        # Create pairs using the minimum length approach
+        # just index i by i until the shorter one is reached
+        qn_pairs = min(len(correct_outputs), len(incorrect_outputs))
+        for i in range(qn_pairs):
+            valid_pairs.append((qid, correct_outputs[i], incorrect_outputs[i]))
+
+    print(f"Created {len(valid_pairs)} valid pairs")
+    # Sample pairs if needed
+    if num_samples and num_samples < len(valid_pairs):
+        sampled_pairs = random.sample(valid_pairs, num_samples)
+        print(f"Sampled {num_samples} pairs from {len(valid_pairs)} valid pairs")
     else:
-        sampled_questions = eligible_questions
-        print(f"Using all {len(eligible_questions)} eligible questions")
+        sampled_pairs = valid_pairs
+        print(f"Using all {len(valid_pairs)} valid pairs")
 
-    # Create a filtered dataset with exactly one correct and one incorrect solution per question
-    print("Selecting one correct and one incorrect solution per sampled question...")
+    # Build final dataset
     filtered_data = []
+    for qid, correct_output_id, incorrect_output_id in tqdm(
+        sampled_pairs, desc="Building dataset"
+    ):
+        # Get and add correct solution, just take the first one (there may be duplicate qid-outputid due to multiple verification rationales for one qid-outputid)
+        correct_row = df[
+            (df["question_id"] == qid) & (df["model_output_id"] == correct_output_id)
+        ].iloc[0]
+        filtered_data.append(correct_row)
 
-    for question_id in tqdm(sampled_questions, desc="Processing questions"):
-        question_df = df[df["question_id"] == question_id]
+        # Get and add incorrect solution
+        incorrect_row = df[
+            (df["question_id"] == qid) & (df["model_output_id"] == incorrect_output_id)
+        ].iloc[0]
+        filtered_data.append(incorrect_row)
 
-        # Get ALL correct and incorrect solutions for this question
-        correct_solutions = question_df[question_df["correct"] == "Yes"]
-        incorrect_solutions = question_df[question_df["correct"] == "No"]
-
-        # Take the FIRST correct and FIRST incorrect solution
-        filtered_data.append(correct_solutions.iloc[0])
-        filtered_data.append(incorrect_solutions.iloc[0])
-
-    # Convert back to DataFrame
+    # Convert to DataFrame
     master_df = pd.DataFrame(filtered_data)
 
-    # Verify each question has exactly one correct and one incorrect solution
-    verification = (
-        master_df.groupby(["question_id", "correct"]).size().unstack(fill_value=0)
-    )
     print(
-        f"Final dataset contains {len(verification)} unique questions, each with one correct and one incorrect solution"
+        f"Final dataset: {len(master_df)} entries ({len(sampled_pairs)} question pairs)"
     )
 
     return master_df

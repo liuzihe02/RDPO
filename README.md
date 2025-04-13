@@ -96,6 +96,26 @@ After some quick EDA, we've indeed checked that all data is only GSM8K math prob
 
 We call the *solution* as the full text containing COT and the final numerical *answer*.
 
+### Sampling Data for Training
+
+1. First filter data for questions such that both correct and incorrect solutions exist
+2. Arrange them into pairs of correct and incorrect solutions
+3. Then sample `num_samples` amount of `correct-incorrect` **solution pairs**, to form `master_df`
+  - The solutions are not repeated; so for each question all the model solutions are distinct
+  - However in the original dataset sometimes the model solutions are repeated, although the verification rationale is *always* distinct
+  - We do this pairiing so for ease in DPO and RDPO
+   
+The master df will always be of the form:
+```
+qn1-output1-correct
+qn1-output3-incorrect
+qn1-output5-correct
+qn1-output6-incorrect
+qn2-output1-correct
+qn2-output3-incorrect
+...
+```
+
 
 ## Experiments
 
