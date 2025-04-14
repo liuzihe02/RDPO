@@ -10,7 +10,7 @@ model_dir="../../train/LLaMA-Factory/output_models/train-qwen2.5-0.5b-genrm-sft-
 #we will create a results directory in the results folder
 output_dir="../evaluate-results"
 #number of samples to use for validation
-num_samples=10
+num_samples=500
 
 # these are evaluation scripts for Critique-Fine-Tuning
 
