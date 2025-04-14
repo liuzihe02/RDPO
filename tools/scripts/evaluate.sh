@@ -53,6 +53,8 @@ for checkpoint_dir in ${model_dir}/checkpoint-*; do
         checkpoint_output="${results_dir}/checkpoint-${checkpoint_num}/"
         
         echo "Processing checkpoint-${checkpoint_num}"
+        # EVALUATION SETTINGS
+        
         bash validate_single.sh "$checkpoint_dir" "$checkpoint_output" "$summary_path" "$data" "$num_samples"
     fi
 done
