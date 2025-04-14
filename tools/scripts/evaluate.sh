@@ -31,7 +31,7 @@ model_name=$(basename "$model_dir")
 
 # create the results folder in the output_dir
 # we temporarily create the name first
-results_dir="${output_dir}/${model_name}"
+results_dir="${output_dir}/${model_name}-${data}"
 
 # Check if the results_dir already exists
 if [ -d "$results_dir" ]; then
