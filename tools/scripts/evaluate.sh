@@ -1,16 +1,16 @@
 #!/bin/bash
-set -ex
+set -e
 
 #this file does validation on the math500 dataset
 
 export CUDA_VISIBLE_DEVICES=1
 
 #this directory contains many subdirectories. Each subdirectory is a checkpoint directory
-model_dir="../train/LLaMA-Factory/output_models/train-qwen2.5-0.5b-genrm-sft-no_veri"
+model_dir="../../train/LLaMA-Factory/output_models/train-qwen2.5-0.5b-genrm-sft-no_veri"
 #we will create a results directory in the results folder
-output_dir="../evaluate-results/"
+output_dir="../evaluate-results"
 #number of samples to use for validation
-num_samples=500
+num_samples=10
 
 # these are evaluation scripts for Critique-Fine-Tuning
 
@@ -28,7 +28,7 @@ model_name=$(basename "$model_dir")
 
 # create the results folder in the output_dir
 # we temporarily create the name first
-results_dir="${output_dir}/results_${model_name}"
+results_dir="${output_dir}/${model_name}"
 
 # Check if the results_dir already exists
 if [ -d "$results_dir" ]; then
