@@ -140,7 +140,7 @@ def _load_single_dataset(
             trust_remote_code=model_args.trust_remote_code,
         )
 
-    logger.info_rank0(f"zihe dataset load single {dataset[0]}")
+    # logger.info_rank0(f"zihe dataset load single {dataset[0]}")
 
     if dataset_attr.num_samples is not None and not data_args.streaming:
         target_num = dataset_attr.num_samples
@@ -276,13 +276,12 @@ def _get_preprocessed_dataset(
         **kwargs,
     )
 
-    # zihe needs to check how dataset is also structured here
-    logger.info_rank0(f"zihe after mapping preprocess{dataset}")
+    # # zihe needs to check how dataset is also structured here
+    # logger.info_rank0(f"zihe after mapping preprocess{dataset}")
 
     # TODO: zihe temporary check, you can make this permanently true to inspect the data after preprocess
     # whats in the inputs and labels
-    if True:
-        # if training_args.should_log:
+    if training_args.should_log:
         try:
             print("eval example:" if is_eval else "training example:")
             dataset_processor.print_data_example(next(iter(dataset)))

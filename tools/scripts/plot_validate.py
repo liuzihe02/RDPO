@@ -66,4 +66,4 @@ def plot_validation_results(validation_dir):
 
 if __name__ == "__main__":
     # this current directory
-    plot_validation_results("./")
+    plot_validation_results("../evaluate-results/")

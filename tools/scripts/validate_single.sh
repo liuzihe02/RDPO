@@ -15,7 +15,7 @@ mkdir -p $OUTPUT_DIR
 CURRENT_DIR=$(pwd)
 
 #cd to the evaluate_math folder
-cd ../../../tools/evaluate_math
+cd ../evaluate_math
 
 DATA_NAME="math-500"
 TOKENIZERS_PARALLELISM=false \
@@ -25,9 +25,6 @@ TOKENIZERS_PARALLELISM=false \
 
 #max_tokens_per_call is how many we allow to generate; default 2048
 #this is also how many we allow as input
-
-
-echo "${CURRENT_DIR}/${MODEL_NAME_OR_PATH}"
 
 #we also added use_safetensors
 python3 -u math_eval.py \
@@ -44,9 +41,9 @@ python3 -u math_eval.py \
     --top_p 1 \
     --start 0 \
     --end -1 \
-    --use_vllm \
-    --max_tokens_per_call 1024 \
+    --max_tokens_per_call 2048 \
     --save_outputs \
-    --use_safetensors
+    --use_safetensors \
+    --use_vllm
 
 

@@ -1,11 +1,6 @@
 ### model
 model_name_or_path: Qwen/Qwen2.5-0.5B-Instruct
 
-# no need quantization for H100, may decrease performance actually
-# #qlora
-# quantization_bit: 8
-# quantization_method: bitsandbytes # choices: [bitsandbytes (4/8), hqq (2/3/4/5/6/8), eetq (8)]
-
 trust_remote_code: true
 
 ### method
@@ -17,9 +12,6 @@ do_train: true
 do_eval: false
 #Fine-tuning method. Optional: freeze, lora, full
 finetuning_type: full
-
-# lora_rank: 2
-# lora_target: all
 
 deepspeed: examples/deepspeed/ds_z0_config.json # choices: [ds_z0_config.json, ds_z2_config.json, ds_z3_config.json]
 pref_beta: 0.1
