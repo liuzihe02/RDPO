@@ -19,9 +19,14 @@ cd ../../../tools/evaluate_math
 
 DATA_NAME="math-500"
 TOKENIZERS_PARALLELISM=false \
-#the max tokens is an important parameter
-#we also added use_safetensors
 # need to use absolute paths here as we've changed directory
+
+#remember to activate vllm
+
+#max_tokens_per_call is how many we allow to generate; default 2048
+#this is also how many we allow as input
+
+#we also added use_safetensors
 python3 -u math_eval.py \
     --model_name_or_path ${CURRENT_DIR}/${MODEL_NAME_OR_PATH} \
     --data_name ${DATA_NAME} \
@@ -36,7 +41,9 @@ python3 -u math_eval.py \
     --top_p 1 \
     --start 0 \
     --end -1 \
-    --max_tokens_per_call 1024 \
+    --use_vllm \
+    --max_tokens_per_call 2048 \
     --save_outputs \
     --use_safetensors
+
 
