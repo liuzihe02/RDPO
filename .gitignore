@@ -26,6 +26,8 @@ venv2/
 .git_backup/
 clean/
 
+# We want to selectively keep and ignore logging results. Keep images and logs, dont upload weights
+
 # Ignore all FILES in checkpoint directories
 # this is NOT THE SAME as ignoring the entire directory completely
 # this is finding a directory and ignoring FILES inside the directory

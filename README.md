@@ -362,9 +362,82 @@ We add an extra field `reasoning_weight` to the finetuning args with default val
 
 ## Training Scripts
 
-Make sure all the scripts have the same settings. We manually verify this because its just easier.
+Make sure all the scripts have the right settiings; we manually customize this for every style of training as it is easier.
 
 TODO: you probably need to double check all the tokens; what goes in and out of the LLM, before you finally confirm the results
+
+```bash
+### model
+model_name_or_path: Qwen/Qwen2.5-0.5B-Instruct
+
+# no need quantization for H100, may decrease performance actually
+# #qlora
+# quantization_bit: 8
+# quantization_method: bitsandbytes # choices: [bitsandbytes (4/8), hqq (2/3/4/5/6/8), eetq (8)]
+
+trust_remote_code: true
+
+### method
+
+#what kind of training, we usually use dpo or sft. the data format layout changes accordingly
+stage: dpo
+#true for training, false for eval
+do_train: true
+do_eval: false
+#Fine-tuning method. Optional: freeze, lora, full
+finetuning_type: full
+
+# lora_rank: 2
+# lora_target: all
+
+deepspeed: examples/deepspeed/ds_z2_offload_config.json # choices: [ds_z0_config.json, ds_z2_config.json, ds_z3_config.json]
+pref_beta: 0.1
+pref_loss: sigmoid # choices: [sigmoid (dpo), orpo, simpo]
+
+### dataset
+
+#must exist locally, in the LlamaFactory dataset folder
+dataset: genrm_dpo
+#Dataset template, please ensure that the dataset template corresponds to the model.
+template: qwen
+#this can significantly affect cuda memory use
+cutoff_len: 2048
+
+#subset of entire training set, for experimentation
+# only use positive numbers here
+# set it to the size of the dataset
+# max_samples: 1000
+
+overwrite_cache: true
+preprocessing_num_workers: 16
+
+### output
+output_dir: output_models/train-qwen2.5-0.5b-genrm-dpo
+logging_steps: 1
+save_steps: 10
+plot_loss: true
+overwrite_output_dir: false
+save_only_model: true
+
+### train
+
+#use higher batch size for more efficiency
+per_device_train_batch_size: 16
+
+#stores these gradients instead of immediately updating after every batch
+#primarily used to simulate larger batch size when not enough GPU memory to fit desired batch size
+#memory reduction thing
+#for H100, we have enough memory, can set as 1
+gradient_accumulation_steps: 1
+learning_rate: 5.0e-6
+num_train_epochs: 2.0
+lr_scheduler_type: cosine
+warmup_ratio: 0.1
+bf16: true
+ddp_timeout: 180000000
+```
+
+Note that the hyperparameters here are defined in both `src/llamafactory/hparams` and the transformers package `.venv/lib64/python3.10/site-packages/transformers/training_args.py`
 
 ## Validation Scripts
 
