@@ -3,14 +3,14 @@ set -e
 
 #this file does validation on the math500 dataset
 
-export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=3
 
 #this directory contains many subdirectories. Each subdirectory is a checkpoint directory
 model_dir="../../LLaMA-Factory/output_models/train-qwen2.5-0.5b-genrm-sft-no_veri"
 #we will create a results directory in the current folder
 output_dir="./"
 #number of samples to use for validation
-num_samples=10
+num_samples=500
 
 #get the model name
 model_name=$(basename "$model_dir")
@@ -36,14 +36,9 @@ summary_path="${results_dir}/validation_summary.txt"
 for checkpoint_dir in ${model_dir}/checkpoint-*; do
     if [ -d "$checkpoint_dir" ]; then
         checkpoint_num=$(basename "$checkpoint_dir" | cut -d'-' -f2)
+        checkpoint_output="${results_dir}/checkpoint-${checkpoint_num}/"
         
-        if [ "$checkpoint_num" -ge 1 ] && [ "$checkpoint_num" -lt 100 ]; then
-            checkpoint_output="${results_dir}/checkpoint-${checkpoint_num}/"
-            
-            echo "Processing checkpoint-${checkpoint_num}"
-            bash validate_single.sh "$checkpoint_dir" "$checkpoint_output" "$summary_path" "$num_samples"
-        else
-            echo "Skipping checkpoint-${checkpoint_num} (≥ 100)"
-        fi
+        echo "Processing checkpoint-${checkpoint_num}"
+        bash validate_single.sh "$checkpoint_dir" "$checkpoint_output" "$summary_path" "$num_samples"
     fi
 done
