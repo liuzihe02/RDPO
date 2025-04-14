@@ -6,8 +6,9 @@ MODEL_NAME_OR_PATH=$1
 OUTPUT_DIR=$2
 SUMMARY_PATH=$3
 SPLIT="test"
+DATA_NAME=$4
 #this is an important parameter which decides how many test samples we want
-NUM_TEST_SAMPLE=$4
+NUM_TEST_SAMPLE=$5
 
 mkdir -p $OUTPUT_DIR
 
@@ -17,7 +18,7 @@ CURRENT_DIR=$(pwd)
 #cd to the evaluate_math folder
 cd ../evaluate_math
 
-DATA_NAME="math-500"
+
 TOKENIZERS_PARALLELISM=false \
 # need to use absolute paths here as we've changed directory
 

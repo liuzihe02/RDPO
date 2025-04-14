@@ -9,6 +9,9 @@ export CUDA_VISIBLE_DEVICES=1
 model_dir="../../train/LLaMA-Factory/output_models/train-qwen2.5-0.5b-genrm-sft-no_veri"
 #we will create a results directory in the results folder
 output_dir="../evaluate-results"
+#what data to evaluate on; these are available
+#"math,math-500,minerva_math,gsm8k,olympiadbench,amc23,aime24,theoremqa"
+data="gsm8k"
 #number of samples to use for validation
 num_samples=500
 
@@ -50,7 +53,7 @@ for checkpoint_dir in ${model_dir}/checkpoint-*; do
         checkpoint_output="${results_dir}/checkpoint-${checkpoint_num}/"
         
         echo "Processing checkpoint-${checkpoint_num}"
-        bash validate_single.sh "$checkpoint_dir" "$checkpoint_output" "$summary_path" "$num_samples"
+        bash validate_single.sh "$checkpoint_dir" "$checkpoint_output" "$summary_path" "$data" "$num_samples"
     fi
 done
 
