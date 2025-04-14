@@ -1,10 +1,5 @@
 ### model
 model_name_or_path: Qwen/Qwen2.5-0.5B-Instruct
-
-# #qlora
-# quantization_bit: 4
-# quantization_method: bitsandbytes # choices: [bitsandbytes (4/8), hqq (2/3/4/5/6/8), eetq (8)]
-
 trust_remote_code: true
 
 ### method
@@ -17,19 +12,13 @@ do_eval: false
 #Fine-tuning method. Optional: freeze, lora, full
 finetuning_type: full
 
-# lora_rank: 2
-# lora_target: all
-
 deepspeed: examples/deepspeed/ds_z0_config.json # choices: [ds_z0_config.json, ds_z2_config.json, ds_z3_config.json]
 pref_beta: 0.1
 pref_loss: sigmoid # choices: [sigmoid (dpo), orpo, simpo]
 
 ### dataset
 
-#must exist locally, in the LlamaFactory dataset folder
-# somehow in the datasets info its all _ instead of - so we adopt this convention
 dataset: genrm_sft_veri
-#Dataset template, please ensure that the dataset template corresponds to the model.
 template: qwen
 #this can significantly affect cuda memory use
 cutoff_len: 2048
