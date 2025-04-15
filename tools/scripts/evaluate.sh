@@ -14,8 +14,8 @@ output_dir="../evaluate-results"
 #what data to evaluate on; these are available
 #"math,math-500,minerva_math,gsm8k,olympiadbench,amc23,aime24,theoremqa"
 data="gsm8k,math-500"
-
 #number of samples to use for validation
+#if multiple datasets are provided, then we take num_samples from EACH dataset
 num_samples=500
 
 # these are evaluation scripts for Critique-Fine-Tuning

@@ -264,8 +264,8 @@ def _get_preprocessed_dataset(
             desc="Running tokenizer on dataset",
         )
 
-    # zihe need to check how dataset is structured here
-    logger.info_rank0(f"zihe before mapping preprocess{dataset}")
+    # # zihe need to check how dataset is structured here
+    # logger.info_rank0(f"zihe before mapping preprocess{dataset}")
 
     # this will use RDPOPairwiseDatasetProcessor
     dataset = dataset.map(
