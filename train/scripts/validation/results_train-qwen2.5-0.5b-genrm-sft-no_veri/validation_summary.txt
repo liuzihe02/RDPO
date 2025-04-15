@@ -1,7 +1,0 @@
-/home/zachliu/RDPO/train/scripts/validation/.//results_train-qwen2.5-0.5b-genrm-sft-no_veri/checkpoint-120/math-500 2025-04-14 17:55:03 Final Accuracy: 24.4
-/home/zachliu/RDPO/train/scripts/validation/.//results_train-qwen2.5-0.5b-genrm-sft-no_veri/checkpoint-150/math-500 2025-04-14 17:56:22 Final Accuracy: 22.6
-/home/zachliu/RDPO/train/scripts/validation/.//results_train-qwen2.5-0.5b-genrm-sft-no_veri/checkpoint-180/math-500 2025-04-14 17:58:04 Final Accuracy: 22.2
-/home/zachliu/RDPO/train/scripts/validation/.//results_train-qwen2.5-0.5b-genrm-sft-no_veri/checkpoint-189/math-500 2025-04-14 17:59:32 Final Accuracy: 23.4
-/home/zachliu/RDPO/train/scripts/validation/.//results_train-qwen2.5-0.5b-genrm-sft-no_veri/checkpoint-30/math-500 2025-04-14 18:01:00 Final Accuracy: 30.6
-/home/zachliu/RDPO/train/scripts/validation/.//results_train-qwen2.5-0.5b-genrm-sft-no_veri/checkpoint-60/math-500 2025-04-14 18:02:35 Final Accuracy: 25.0
-/home/zachliu/RDPO/train/scripts/validation/.//results_train-qwen2.5-0.5b-genrm-sft-no_veri/checkpoint-90/math-500 2025-04-14 18:04:01 Final Accuracy: 25.2
