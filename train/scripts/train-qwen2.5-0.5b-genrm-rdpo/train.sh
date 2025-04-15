@@ -4,7 +4,7 @@
 cd ../../LLaMA-Factory
 PROJECT_NAME="RDPO"
 #make all gpus avaiable for training
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=2,3,4,5,6,7
 export WANDB_API_KEY=f318ffd0dcf5d31701fd33aee12e57e9cf15444f
 export WANDB_PROJECT=$PROJECT_NAME
 #disable WANDB
@@ -39,7 +39,7 @@ llamafactory-cli export \
   --model_name_or_path $MODEL_NAME_OR_PATH \
   --export_dir $OUTPUT_DIR/checkpoint-0 \
   --trust_remote_code true
-echo "Successfully exporeted initial model!"
+echo "Successfully exported initial model!"
 
 # Continue with training if the directory doesn't exist
 FORCE_TORCHRUN=1 llamafactory-cli train $CONFIG_FILE

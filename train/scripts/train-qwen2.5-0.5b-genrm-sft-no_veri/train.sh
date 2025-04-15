@@ -39,7 +39,7 @@ llamafactory-cli export \
   --model_name_or_path $MODEL_NAME_OR_PATH \
   --export_dir $OUTPUT_DIR/checkpoint-0 \
   --trust_remote_code true
-echo "Successfully exporeted initial model!"
+echo "Successfully exported initial model!"
 
 # Continue with training if the directory doesn't exist
 FORCE_TORCHRUN=1 llamafactory-cli train $CONFIG_FILE
