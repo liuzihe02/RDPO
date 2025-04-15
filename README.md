@@ -116,6 +116,7 @@ qn2-output3-incorrect
 ...
 ```
 
+This means that if `num_samples` is 100, there are technically 200 data points for DPO/RDPO, and 100 datapoints for SFT, SFT-veri.
 
 ## Experiments
 
@@ -416,7 +417,12 @@ output_dir: output_models/train-qwen2.5-0.5b-genrm-dpo
 logging_steps: 1
 save_steps: 10
 plot_loss: true
-overwrite_output_dir: false
+#we set this to true intentionally
+# this command when true means it detects the same dir name, it will wipe the previous results and start afresh
+# when false it means it will resume from last checkpoint
+# we face some issues when resuming from last checkpoint (because we save the initial model as one checkpoint manually)
+# hence we set this to true (we dont allow automatic overrides anyway, so true or false doesnt matter)
+overwrite_output_dir: true
 save_only_model: true
 
 ### train
@@ -437,7 +443,7 @@ bf16: true
 ddp_timeout: 180000000
 ```
 
-Note that the hyperparameters here are defined in both `src/llamafactory/hparams` and the transformers package `.venv/lib64/python3.10/site-packages/transformers/training_args.py`
+Note that the hyperparameters here are defined in **both** `src/llamafactory/hparams` and the transformers package `.venv/lib64/python3.10/site-packages/transformers/training_args.py`
 
 ## Validation Scripts
 

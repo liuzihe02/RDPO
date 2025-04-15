@@ -50,7 +50,7 @@ output_dir: output_models/train-qwen2.5-0.5b-genrm-rdpo
 logging_steps: 1
 save_steps: 3
 plot_loss: true
-overwrite_output_dir: false
+overwrite_output_dir: true
 save_only_model: true
 
 ### train
