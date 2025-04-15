@@ -1,9 +1,9 @@
 {
     "num_samples": 500,
     "num_scores": 500,
-    "timeout_samples": 0,
-    "empty_samples": 5,
-    "acc": 25.6,
-    "time_use_in_second": 21.0274715423584,
-    "time_use_in_minite": "0:21"
+    "timeout_samples": 1,
+    "empty_samples": 3,
+    "acc": 28.8,
+    "time_use_in_second": 33.37021541595459,
+    "time_use_in_minite": "0:33"
 }
