@@ -23,6 +23,8 @@ CONFIG_FILE="../scripts/train-qwen2.5-0.5b-genrm-sft-no_veri/train.yaml"
 
 # Extract output directory from yaml file using grep with a pattern that anchors to the beginning of the line
 OUTPUT_DIR=$(grep -m1 "^output_dir:" "$CONFIG_FILE" | cut -d':' -f2 | tr -d ' ')
+#extract model name too
+MODEL_NAME_OR_PATH=$(grep -m1 "^model_name_or_path:" "$CONFIG_FILE" | cut -d':' -f2 | tr -d ' ')
 
 # Check if output directory exists
 if [ -d "$OUTPUT_DIR" ]; then
@@ -31,6 +33,13 @@ if [ -d "$OUTPUT_DIR" ]; then
 else
     echo "Output directory '$OUTPUT_DIR' does not exist. Safe to proceed."
 fi
+
+#save the first checkpoint of the model because the training script doesnt do this for us
+llamafactory-cli export \
+  --model_name_or_path $MODEL_NAME_OR_PATH \
+  --export_dir $OUTPUT_DIR/checkpoint-0 \
+  --trust_remote_code true
+echo "Successfully exporeted initial model!"
 
 # Continue with training if the directory doesn't exist
 FORCE_TORCHRUN=1 llamafactory-cli train $CONFIG_FILE

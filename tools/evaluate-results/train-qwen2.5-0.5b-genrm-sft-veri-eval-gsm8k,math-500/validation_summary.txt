@@ -1,0 +1,16 @@
+/home/zachliu/RDPO/tools/scripts/../evaluate-results/train-qwen2.5-0.5b-genrm-sft-veri-eval-gsm8k,math-500/checkpoint-0/gsm8k 2025-04-15 18:21:37 Final Accuracy: 49.6
+/home/zachliu/RDPO/tools/scripts/../evaluate-results/train-qwen2.5-0.5b-genrm-sft-veri-eval-gsm8k,math-500/checkpoint-0/math-500 2025-04-15 18:22:16 Final Accuracy: 34.4
+/home/zachliu/RDPO/tools/scripts/../evaluate-results/train-qwen2.5-0.5b-genrm-sft-veri-eval-gsm8k,math-500/checkpoint-100/gsm8k 2025-04-15 18:23:25 Final Accuracy: 48.6
+/home/zachliu/RDPO/tools/scripts/../evaluate-results/train-qwen2.5-0.5b-genrm-sft-veri-eval-gsm8k,math-500/checkpoint-100/math-500 2025-04-15 18:24:06 Final Accuracy: 33.0
+/home/zachliu/RDPO/tools/scripts/../evaluate-results/train-qwen2.5-0.5b-genrm-sft-veri-eval-gsm8k,math-500/checkpoint-200/gsm8k 2025-04-15 18:25:23 Final Accuracy: 45.4
+/home/zachliu/RDPO/tools/scripts/../evaluate-results/train-qwen2.5-0.5b-genrm-sft-veri-eval-gsm8k,math-500/checkpoint-200/math-500 2025-04-15 18:26:00 Final Accuracy: 30.6
+/home/zachliu/RDPO/tools/scripts/../evaluate-results/train-qwen2.5-0.5b-genrm-sft-veri-eval-gsm8k,math-500/checkpoint-300/gsm8k 2025-04-15 18:27:12 Final Accuracy: 49.0
+/home/zachliu/RDPO/tools/scripts/../evaluate-results/train-qwen2.5-0.5b-genrm-sft-veri-eval-gsm8k,math-500/checkpoint-300/math-500 2025-04-15 18:27:52 Final Accuracy: 32.0
+/home/zachliu/RDPO/tools/scripts/../evaluate-results/train-qwen2.5-0.5b-genrm-sft-veri-eval-gsm8k,math-500/checkpoint-400/gsm8k 2025-04-15 18:29:01 Final Accuracy: 49.0
+/home/zachliu/RDPO/tools/scripts/../evaluate-results/train-qwen2.5-0.5b-genrm-sft-veri-eval-gsm8k,math-500/checkpoint-400/math-500 2025-04-15 18:29:35 Final Accuracy: 30.2
+/home/zachliu/RDPO/tools/scripts/../evaluate-results/train-qwen2.5-0.5b-genrm-sft-veri-eval-gsm8k,math-500/checkpoint-500/gsm8k 2025-04-15 18:30:49 Final Accuracy: 47.4
+/home/zachliu/RDPO/tools/scripts/../evaluate-results/train-qwen2.5-0.5b-genrm-sft-veri-eval-gsm8k,math-500/checkpoint-500/math-500 2025-04-15 18:31:31 Final Accuracy: 29.8
+/home/zachliu/RDPO/tools/scripts/../evaluate-results/train-qwen2.5-0.5b-genrm-sft-veri-eval-gsm8k,math-500/checkpoint-600/gsm8k 2025-04-15 18:32:49 Final Accuracy: 48.0
+/home/zachliu/RDPO/tools/scripts/../evaluate-results/train-qwen2.5-0.5b-genrm-sft-veri-eval-gsm8k,math-500/checkpoint-600/math-500 2025-04-15 18:33:25 Final Accuracy: 30.8
+/home/zachliu/RDPO/tools/scripts/../evaluate-results/train-qwen2.5-0.5b-genrm-sft-veri-eval-gsm8k,math-500/checkpoint-625/gsm8k 2025-04-15 18:34:36 Final Accuracy: 47.4
+/home/zachliu/RDPO/tools/scripts/../evaluate-results/train-qwen2.5-0.5b-genrm-sft-veri-eval-gsm8k,math-500/checkpoint-625/math-500 2025-04-15 18:35:14 Final Accuracy: 31.6

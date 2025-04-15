@@ -11,7 +11,7 @@ do_train: true
 do_eval: false
 #Fine-tuning method. Optional: freeze, lora, full
 finetuning_type: full
-deepspeed: examples/deepspeed/ds_z0_config.json # choices: [ds_z0_config.json, ds_z2_config.json, ds_z3_config.json]
+deepspeed: examples/deepspeed/ds_z2_config.json # choices: [ds_z0_config.json, ds_z2_config.json, ds_z3_config.json]
 
 ### dataset
 
@@ -29,11 +29,11 @@ output_dir: output_models/train-qwen2.5-0.5b-genrm-sft-no_veri
 logging_steps: 1
 save_steps: 100
 plot_loss: true
-overwrite_output_dir: false
+overwrite_output_dir: true
 save_only_model: true
 
 ### train
-per_device_train_batch_size: 48
+per_device_train_batch_size: 32
 #stores these gradients instead of immediately updating after every batch
 #best to keep the same or increase
 gradient_accumulation_steps: 1
