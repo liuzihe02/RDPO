@@ -3,15 +3,18 @@ set -e
 
 #this file does validation on the math500 dataset
 
-export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=2
 
 #this directory contains many subdirectories. Each subdirectory is a checkpoint directory
 model_dir="../../train/LLaMA-Factory/output_models/train-qwen2.5-0.5b-genrm-sft-no_veri"
+
 #we will create a results directory in the results folder
 output_dir="../evaluate-results"
+
 #what data to evaluate on; these are available
 #"math,math-500,minerva_math,gsm8k,olympiadbench,amc23,aime24,theoremqa"
-data="gsm8k"
+data="gsm8k,math-500"
+
 #number of samples to use for validation
 num_samples=500
 
