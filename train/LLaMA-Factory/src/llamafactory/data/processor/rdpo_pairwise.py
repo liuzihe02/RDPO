@@ -60,6 +60,7 @@ class RDPOPairwiseDatasetProcessor(PairwiseDatasetProcessor):
         Returns a tuple containing the original pairwise data plus reasoning information.
         """
         # Call the parent class method to get the base pairwise data, for chosen and rejected
+        # this standardizes length of chosen and rejected to be the same!
         chosen_input_ids, chosen_labels, rejected_input_ids, rejected_labels = super()._encode_data_example(
             prompt, response[:2], system, tools, images, videos, audios
         )
@@ -90,8 +91,8 @@ class RDPOPairwiseDatasetProcessor(PairwiseDatasetProcessor):
 
         # Apply length constraints
         # zihe TODO: the way the len(reasoning_ids) instead of using max may cause problems but hopefully its fine if the cutoff length is long enough
-        # source length is max length or prompt
-        # target length is max length for reasoning
+        # source length is max length of prompt
+        # target length is max length of reasoning
         source_len, target_len = infer_seqlen(len(prompt_ids), len(reasoning_ids), self.data_args.cutoff_len)
         prompt_ids = prompt_ids[:source_len]
         reasoning_ids = reasoning_ids[:target_len]

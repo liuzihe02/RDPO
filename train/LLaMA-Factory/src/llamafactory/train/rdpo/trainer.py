@@ -41,7 +41,14 @@ class CustomRDPOTrainer(CustomDPOTrainer):
     def concatenated_forward(
         self, model: "PreTrainedModel", batch: Dict[str, "torch.Tensor"]
     ) -> Tuple[
-        "torch.Tensor", "torch.Tensor", "torch.Tensor", "torch.Tensor", "torch.Tensor", "torch.Tensor", "torch.Tensor"
+        "torch.Tensor",
+        "torch.Tensor",
+        "torch.Tensor",
+        "torch.Tensor",
+        "torch.Tensor",
+        "torch.Tensor",
+        "torch.Tensor",
+        "torch.Tensor",
     ]:
         r"""
         Computes the sum log probabilities of the labels under given logits if loss_type is not IPO, ORPO or SimPO.
@@ -61,25 +68,46 @@ class CustomRDPOTrainer(CustomDPOTrainer):
 
         # this batch will be a dictionary of stuff decided in data_collator.py
         # dict keys are input_ids, attention_mask, labels
-        # each dict item is a tensor of size (batch_size_per_device *3, seq_len)
-        # since (chosen, rejected, reasoning)
-        # print(f"zihe check batch shape is {batch['labels'].shape}")
+        # each dict item is a tensor of size (3*batch_size, seq_len)
+        # since (chosen, rejected, reasoning) will give the 3*
+        # print(f"zihe debug batch shape is {batch['labels'].shape}")
 
         # this may cause cuda memory issues, reduce batch size to alleviate this problem
+        # this all logits_is of shape (3 * batch_size, seq_len, d_vocab)
         all_logits: "torch.Tensor" = model(**batch, return_dict=True, use_cache=False).logits.to(torch.float32)
+
+        print(f"zihe debug shape of all logits is {all_logits.shape}")
+
         # this is for labels only
+        # all_logps is of shape (batch_size * 3,)
+        # valid_length is of shape (batch_size * 3,)
         all_logps, valid_length = get_batch_logps(logits=all_logits, labels=batch["labels"])
+        # print(f"zihe debug shape of all_logps is {all_logps.shape}")
+        # print(f"zihe debug shape of valid_length is {valid_length.shape}")
+
         if self.loss_type in ["ipo", "orpo", "simpo"]:
             all_logps = all_logps / valid_length
 
-        # split along the first dimension
+        # split into 3 parts along the first dimension
         # first third is chosen, next third is rejected, last third is reasoning
         batch_size = batch["input_ids"].size(0) // 3
         # i believe the following is the logits/logps for labels only
+        # each of these are of shape (batch_size,)
         chosen_logps, rejected_logps, reasoning_logps = all_logps.split(batch_size, dim=0)
+        print(f"zihe debug shape of chosen_logps is {chosen_logps.shape}")
+        print(f"zihe debug shape of rejected_logps is {rejected_logps.shape}")
+        print(f"zihe debug shape of reasoning_logps is {reasoning_logps.shape}")
         chosen_logits, rejected_logits, reasoning_logits = all_logits.split(batch_size, dim=0)
-        # these lengths are all the same
-        chosen_length, _, _ = valid_length.split(batch_size, dim=0)
+        print(f"zihe debug shape of chosen_logits is {chosen_logits.shape}")
+        print(f"zihe debug shape of rejected_logits is {rejected_logits.shape}")
+        print(f"zihe debug shape of reasoning_logits is {reasoning_logits.shape}")
+
+        # these lengths are NOT all the same
+        # chosen and rejected are the same lengths, but reasoning is a different length
+        # these lengths correspond to the labels (not inputs, so excluding the prompt)
+        # so these correspond to chosen_labels, rejected_labels, and reasoning_labels
+        chosen_length, rejected_length, reasoning_length = valid_length.split(batch_size, dim=0)
+        print(f"zihe debug lengths are: {chosen_length},{rejected_length},{reasoning_length}")
 
         # default loss is sigmoid here
         # last one is a normalized chosen_logps
@@ -93,7 +121,9 @@ class CustomRDPOTrainer(CustomDPOTrainer):
                 rejected_logits,
                 reasoning_logits,
                 chosen_logps,
+                reasoning_logps,
             )
+        # default is here, will be sigmoid
         else:
             return (
                 chosen_logps,
@@ -103,6 +133,7 @@ class CustomRDPOTrainer(CustomDPOTrainer):
                 rejected_logits,
                 reasoning_logits,
                 chosen_logps / chosen_length,
+                reasoning_logps / reasoning_length,
             )
 
     # the compute reference log probs can remain the same
@@ -126,16 +157,18 @@ class CustomRDPOTrainer(CustomDPOTrainer):
             policy_rejected_logits,
             policy_reasoning_logits,
             policy_chosen_logps_avg,
+            policy_reasoning_logps_avg,
         ) = self.concatenated_forward(model, batch)
 
-        # # logps of shape (batch,)
-        # print(f"zihe check shape of policy chosen logps is{policy_chosen_logps.shape}")
-        # print(f"zihe check shape of policy rejected logps is{policy_rejected_logps.shape}")
-        # print(f"zihe check shape of policy reasoning logps is{policy_reasoning_logps.shape}")
-        # # logits of shape (batch, sequence, d_model)
-        # print(f"zihe check shape of policy chosen logits is{policy_chosen_logits.shape}")
-        # print(f"zihe check shape of policy rejected logits is{policy_rejected_logits.shape}")
-        # print(f"zihe check shape of policy reasoning logits is{policy_reasoning_logits.shape}")
+        # logps of shape (batch,)
+        print(f"zihe check shape of policy chosen logps is{policy_chosen_logps.shape}")
+        print(f"zihe check shape of policy rejected logps is{policy_rejected_logps.shape}")
+        print(f"zihe check shape of policy reasoning logps is{policy_reasoning_logps.shape}")
+
+        # logits of shape (batch, sequence, d_vocab)
+        print(f"zihe check shape of policy chosen logits is{policy_chosen_logits.shape}")
+        print(f"zihe check shape of policy rejected logits is{policy_rejected_logits.shape}")
+        print(f"zihe check shape of policy reasoning logits is{policy_reasoning_logits.shape}")
 
         # Get reference log probs
         # since compute_reference_log_probs calls a method that we override,
@@ -165,9 +198,15 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         # For reasoning loss, we simply use the negative log probability
         # This is simpler than the DPO loss formulation because we're not comparing two alternatives
         # We just want to maximize the probability of generating good verification reasoning
-        reasoning_loss = -policy_reasoning_logps
 
         # Combine DPO loss with reasoning loss
+        # normalized version
+        if self.finetuning_args.norm_reasoning:
+            reasoning_loss = -policy_reasoning_logps_avg
+        # un-normalized version
+        else:
+            reasoning_loss = -policy_reasoning_logps
+
         combined_losses = (1 - self.reasoning_weight) * dpo_losses + self.reasoning_weight * reasoning_loss
 
         # IMPORTANT take mean over everything

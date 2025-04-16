@@ -452,7 +452,16 @@ class FinetuningArguments(
     rdpo: bool = field(
         # default always false
         default=False,
-        metadata={"help": "if you use dpo, need to specify if you want rdpo for veri reasoning"},
+        metadata={
+            "help": "if you use dpo, need to specify if you want rdpo for veri reasoning. else it will be vanilla DPO"
+        },
+    )
+
+    # zihe extra argument whether to normalize reasoning data by length or not
+    norm_reasoning: bool = field(
+        # default always false
+        default=False,
+        metadata={"help": "whether to normalize the reasoning logprobs by the length or not"},
     )
 
     def __post_init__(self):
