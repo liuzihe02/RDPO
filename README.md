@@ -427,6 +427,12 @@ save_only_model: true
 
 ### train
 
+#regular training stores all activations for faster backprop
+#for gradient checkpointing, we only store activations at certain checkpoints
+#compute them on the fly
+#this reduces memory usage but makes training slow
+gradient_checkpointing: true
+
 #use higher batch size for more efficiency
 per_device_train_batch_size: 16
 
