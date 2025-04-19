@@ -431,6 +431,7 @@ save_only_model: true
 #for gradient checkpointing, we only store activations at certain checkpoints
 #compute them on the fly
 #this reduces memory usage but makes training slow
+# not really sure if it really helps lol
 gradient_checkpointing: true
 
 #use higher batch size for more efficiency

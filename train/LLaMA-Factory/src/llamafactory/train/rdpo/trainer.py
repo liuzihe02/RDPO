@@ -46,9 +46,6 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         "torch.Tensor",
         "torch.Tensor",
         "torch.Tensor",
-        "torch.Tensor",
-        "torch.Tensor",
-        "torch.Tensor",
     ]:
         r"""
         Computes the sum log probabilities of the labels under given logits if loss_type is not IPO, ORPO or SimPO.
@@ -62,6 +59,10 @@ class CustomRDPOTrainer(CustomDPOTrainer):
 
         the batch here already contains logits for chosen, rejected, reasoning
         the way this is structured is defined in RDPOPairwiseDataCollatorWithPadding
+
+        DO NOT RETURN THE LOGITS AS THIS TAKES UP ALOT OF MEMORY
+        let garbage collector to its work
+        logits of shape (batch, sequence, d_vocab) so for a large d_vocab, this is a very big tensor of a few Gbs
         """
         if self.finetuning_args.use_ref_model:
             batch = nested_detach(batch, clone=True)  # avoid error
@@ -74,7 +75,17 @@ class CustomRDPOTrainer(CustomDPOTrainer):
 
         # this may cause cuda memory issues, reduce batch size to alleviate this problem
         # this all logits_is of shape (3 * batch_size, seq_len, d_vocab)
-        all_logits: "torch.Tensor" = model(**batch, return_dict=True, use_cache=False).logits.to(torch.float32)
+
+        # keep the data format as is
+        all_logits = model(**batch, return_dict=True, use_cache=False).logits
+
+        # Only convert if you really need it you really need later, not the full 3‑D tensor
+        if self.loss_type in {"ipo", "orpo", "simpo"}:  # these need FP32 division later
+            all_logits = all_logits.float()
+
+        # # in the original llamafactory code, they upcast to float32 - massive memory consumption!!
+        # # our method keeps the data type of bf16 and almost halves the memory
+        # all_logits: "torch.Tensor" = model(**batch, return_dict=True, use_cache=False).logits.to(torch.float32)
 
         print(f"zihe debug shape of all logits is {all_logits.shape}")
 
@@ -97,10 +108,12 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         print(f"zihe debug shape of chosen_logps is {chosen_logps.shape}")
         print(f"zihe debug shape of rejected_logps is {rejected_logps.shape}")
         print(f"zihe debug shape of reasoning_logps is {reasoning_logps.shape}")
-        chosen_logits, rejected_logits, reasoning_logits = all_logits.split(batch_size, dim=0)
-        print(f"zihe debug shape of chosen_logits is {chosen_logits.shape}")
-        print(f"zihe debug shape of rejected_logits is {rejected_logits.shape}")
-        print(f"zihe debug shape of reasoning_logits is {reasoning_logits.shape}")
+
+        # dont need logits here actually
+        # chosen_logits, rejected_logits, reasoning_logits = all_logits.split(batch_size, dim=0)
+        # print(f"zihe debug shape of chosen_logits is {chosen_logits.shape}")
+        # print(f"zihe debug shape of rejected_logits is {rejected_logits.shape}")
+        # print(f"zihe debug shape of reasoning_logits is {reasoning_logits.shape}")
 
         # these lengths are NOT all the same
         # chosen and rejected are the same lengths, but reasoning is a different length
@@ -108,6 +121,8 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         # so these correspond to chosen_labels, rejected_labels, and reasoning_labels
         chosen_length, rejected_length, reasoning_length = valid_length.split(batch_size, dim=0)
         print(f"zihe debug lengths are: {chosen_length},{rejected_length},{reasoning_length}")
+
+        # we can return alot of logps since these take up little memory
 
         # default loss is sigmoid here
         # last one is a normalized chosen_logps
@@ -117,9 +132,6 @@ class CustomRDPOTrainer(CustomDPOTrainer):
                 chosen_logps,
                 rejected_logps,
                 reasoning_logps,
-                chosen_logits,
-                rejected_logits,
-                reasoning_logits,
                 chosen_logps,
                 reasoning_logps,
             )
@@ -129,9 +141,6 @@ class CustomRDPOTrainer(CustomDPOTrainer):
                 chosen_logps,
                 rejected_logps,
                 reasoning_logps,
-                chosen_logits,
-                rejected_logits,
-                reasoning_logits,
                 chosen_logps / chosen_length,
                 reasoning_logps / reasoning_length,
             )
@@ -153,9 +162,6 @@ class CustomRDPOTrainer(CustomDPOTrainer):
             policy_chosen_logps,
             policy_rejected_logps,
             policy_reasoning_logps,
-            policy_chosen_logits,
-            policy_rejected_logits,
-            policy_reasoning_logits,
             policy_chosen_logps_avg,
             policy_reasoning_logps_avg,
         ) = self.concatenated_forward(model, batch)
@@ -164,11 +170,6 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         print(f"zihe check shape of policy chosen logps is{policy_chosen_logps.shape}")
         print(f"zihe check shape of policy rejected logps is{policy_rejected_logps.shape}")
         print(f"zihe check shape of policy reasoning logps is{policy_reasoning_logps.shape}")
-
-        # logits of shape (batch, sequence, d_vocab)
-        print(f"zihe check shape of policy chosen logits is{policy_chosen_logits.shape}")
-        print(f"zihe check shape of policy rejected logits is{policy_rejected_logits.shape}")
-        print(f"zihe check shape of policy reasoning logits is{policy_reasoning_logits.shape}")
 
         # Get reference log probs
         # since compute_reference_log_probs calls a method that we override,
@@ -220,8 +221,6 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         metrics[f"{prefix}rewards/margins"] = (chosen_rewards - rejected_rewards).mean().item()
         metrics[f"{prefix}logps/chosen"] = policy_chosen_logps.mean().item()
         metrics[f"{prefix}logps/rejected"] = policy_rejected_logps.mean().item()
-        metrics[f"{prefix}logits/chosen"] = policy_chosen_logits.mean().item()
-        metrics[f"{prefix}logits/rejected"] = policy_rejected_logits.mean().item()
 
         # Add reasoning loss to metrics
         metrics[f"{prefix}reasoning_loss"] = reasoning_loss.mean().detach().item()

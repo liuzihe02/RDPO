@@ -41,7 +41,7 @@ dataset: genrm_rdpo
 template: qwen
 #this can significantly affect cuda memory use; reduce this if memory problems too much
 # for rdpo, text is doubled so memory issues more prevalent
-cutoff_len: 16
+cutoff_len: 128
 #subset of entire training set, for experimentation
 # only use positive numbers here
 # set it to the size of the dataset
