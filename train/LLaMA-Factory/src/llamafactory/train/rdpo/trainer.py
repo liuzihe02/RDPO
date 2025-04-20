@@ -96,6 +96,12 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         # print(f"zihe debug shape of all_logps is {all_logps.shape}")
         # print(f"zihe debug shape of valid_length is {valid_length.shape}")
 
+        # here we no longer need all_logits so we free memory for this HUGE tensor
+        # saves ALOT of memory!! O3 made this suggestion; I am blown away...
+        # but peak memory is still high, memory tends to fluctuate much more
+        del all_logits
+        torch.cuda.empty_cache()
+
         if self.loss_type in ["ipo", "orpo", "simpo"]:
             all_logps = all_logps / valid_length
 
@@ -239,3 +245,39 @@ class CustomRDPOTrainer(CustomDPOTrainer):
             metrics[f"{prefix}odds_ratio_loss"] = ((dpo_losses - sft_loss) / self.beta).mean().item()
 
         return combined_losses, metrics
+
+    @override
+    def compute_reference_log_probs(
+        self, model: "PreTrainedModel", batch: Dict[str, "torch.Tensor"]
+    ) -> Tuple[Optional["torch.Tensor"], Optional["torch.Tensor"]]:
+        r"""
+        Computes log probabilities of the reference model.
+        """
+        if not self.finetuning_args.use_ref_model:
+            return None, None
+
+        if self.ref_model is None:
+            # print("zihe check ref model is None")
+            # when finetuning is lora
+            # the ref_model is the version without lora; disable lora adapters
+            ref_model = model
+            ref_context = self.accelerator.unwrap_model(model).disable_adapter()
+        else:
+            # print("zihe check ref model is not None")
+            # when finetuning is not lora (full trng)
+            # this is the frozen base model
+            ref_model = self.ref_model
+            ref_context = nullcontext()
+
+        # # if gradient_checkpointing is activated overall, we disable it for the ref model
+        # # no need to turn on as ref_model never used for backprop
+        # if getattr(ref_model, "gradient_checkpointing", False):
+        #     ref_model.gradient_checkpointing_disable()
+
+        # with torch.no_grad(), ref_context:
+        # use inference mode to skip autograd and free buffer quicker
+        # also use autocast to force bf16
+        with torch.inference_mode(), ref_context, torch.cuda.amp.autocast(dtype=torch.bfloat16):
+            reference_chosen_logps, reference_rejected_logps, *_ = self.concatenated_forward(ref_model, batch)
+
+        return reference_chosen_logps, reference_rejected_logps

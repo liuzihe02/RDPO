@@ -227,13 +227,13 @@ class CustomDPOTrainer(DPOTrainer):
             return None, None
 
         if self.ref_model is None:
-            print("zihe check ref model is None")
+            # print("zihe check ref model is None")
             # when finetuning is lora
             # the ref_model is the version without lora; disable lora adapters
             ref_model = model
             ref_context = self.accelerator.unwrap_model(model).disable_adapter()
         else:
-            print("zihe check ref model is not None")
+            # print("zihe check ref model is not None")
             # when finetuning is not lora (full trng)
             # this is the frozen base model
             ref_model = self.ref_model

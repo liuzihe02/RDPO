@@ -353,7 +353,9 @@ Modify `data/__init__.py` to allow `RDPOPairwiseDataCollatorWithPadding` to be s
 
 Modify the trainer to take in the RDPO loss term accordingly
 
-> Note that when LoRA is used, the reference model is simply the base model! LoRA a
+> Note that when LoRA is used, the reference model is the base model without LoRA adapters. The policy is model with LoRA adapters
+>
+> I have hardcoded the trainer files to use `torch.bfloat16`; please always use `bf16: true` in the yaml settings!  To reduce unneccessary type conversions
 
 ### 5. Create `train/rdpo/workflow.py`
 
@@ -448,6 +450,8 @@ learning_rate: 5.0e-6
 num_train_epochs: 2.0
 lr_scheduler_type: cosine
 warmup_ratio: 0.1
+#please keep this settings! when we dequantize; we hardcode to bf16 in RDPO
+#keep bf16 to reduce unneccessary conversions
 bf16: true
 ddp_timeout: 180000000
 ```
