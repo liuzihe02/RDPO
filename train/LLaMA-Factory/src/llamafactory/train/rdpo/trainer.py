@@ -85,7 +85,6 @@ class CustomRDPOTrainer(CustomDPOTrainer):
 
         # # in the original llamafactory code, they upcast to float32 - massive memory consumption!!
         # # our method keeps the data type of bf16 and almost halves the memory
-        # all_logits: "torch.Tensor" = model(**batch, return_dict=True, use_cache=False).logits.to(torch.float32)
 
         print(f"zihe debug shape of all logits is {all_logits.shape}")
 
@@ -95,6 +94,10 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         all_logps, valid_length = get_batch_logps(logits=all_logits, labels=batch["labels"])
         print(f"zihe debug shape of all_logps is {all_logps.shape}")
         print(f"zihe debug shape of valid_length is {valid_length.shape}")
+
+        # split into 3 parts along the first dimension
+        # first third is chosen, next third is rejected, last third is reasoning
+        batch_size = batch["input_ids"].size(0) // 3
 
         # dont need logits here actually
         # PLEASE REMEMBER TO REMOVE
@@ -112,9 +115,6 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         if self.loss_type in ["ipo", "orpo", "simpo"]:
             all_logps = all_logps / valid_length
 
-        # split into 3 parts along the first dimension
-        # first third is chosen, next third is rejected, last third is reasoning
-        batch_size = batch["input_ids"].size(0) // 3
         # i believe the following is the logits/logps for labels only
         # each of these are of shape (batch_size,)
         chosen_logps, rejected_logps, reasoning_logps = all_logps.split(batch_size, dim=0)
