@@ -11,6 +11,7 @@ from trl import DPOTrainer
 from trl.trainer import disable_dropout_in_model
 from typing_extensions import override
 
+from ...extras import logging
 from ...extras.constants import IGNORE_INDEX
 from ...extras.packages import is_transformers_version_greater_than
 from ..dpo.trainer import CustomDPOTrainer
@@ -21,6 +22,8 @@ if TYPE_CHECKING:
     from transformers import PreTrainedModel, ProcessorMixin
 
     from ...hparams import FinetuningArguments
+
+logger = logging.get_logger(__name__)
 
 
 class CustomRDPOTrainer(CustomDPOTrainer):
@@ -41,6 +44,7 @@ class CustomRDPOTrainer(CustomDPOTrainer):
     def concatenated_forward(
         self, model: "PreTrainedModel", batch: Dict[str, "torch.Tensor"]
     ) -> Tuple[
+        "torch.Tensor",
         "torch.Tensor",
         "torch.Tensor",
         "torch.Tensor",
@@ -71,7 +75,7 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         # dict keys are input_ids, attention_mask, labels
         # each dict item is a tensor of size (3*batch_size, seq_len)
         # since (chosen, rejected, reasoning) will give the 3*
-        print(f"zihe debug batch shape is {batch['labels'].shape}")
+        logger.info_rank0(f"zihe debug batch shape is {batch['labels'].shape}")
 
         # this may cause cuda memory issues, reduce batch size to alleviate this problem
         # this all logits_is of shape (3 * batch_size, seq_len, d_vocab)
@@ -86,14 +90,14 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         # # in the original llamafactory code, they upcast to float32 - massive memory consumption!!
         # # our method keeps the data type of bf16 and almost halves the memory
 
-        print(f"zihe debug shape of all logits is {all_logits.shape}")
+        logger.info_rank0(f"zihe debug shape of all logits is {all_logits.shape}")
 
         # this is for labels only
         # all_logps is of shape (batch_size * 3,)
         # valid_length is of shape (batch_size * 3,)
         all_logps, valid_length = get_batch_logps(logits=all_logits, labels=batch["labels"])
-        print(f"zihe debug shape of all_logps is {all_logps.shape}")
-        print(f"zihe debug shape of valid_length is {valid_length.shape}")
+        logger.info_rank0(f"zihe debug shape of all_logps is {all_logps.shape}")
+        logger.info_rank0(f"zihe debug shape of valid_length is {valid_length.shape}")
 
         # split into 3 parts along the first dimension
         # first third is chosen, next third is rejected, last third is reasoning
@@ -102,9 +106,9 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         # dont need logits here actually
         # PLEASE REMEMBER TO REMOVE
         chosen_logits, rejected_logits, reasoning_logits = all_logits.split(batch_size, dim=0)
-        print(f"zihe debug shape of chosen_logits is {chosen_logits.shape}")
-        print(f"zihe debug shape of rejected_logits is {rejected_logits.shape}")
-        print(f"zihe debug shape of reasoning_logits is {reasoning_logits.shape}")
+        logger.info_rank0(f"zihe debug shape of chosen_logits is {chosen_logits.shape}")
+        logger.info_rank0(f"zihe debug shape of rejected_logits is {rejected_logits.shape}")
+        logger.info_rank0(f"zihe debug shape of reasoning_logits is {reasoning_logits.shape}")
 
         # here we no longer need all_logits so we free memory for this HUGE tensor
         # saves ALOT of memory!! O3 made this suggestion; I am blown away...
@@ -118,16 +122,16 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         # i believe the following is the logits/logps for labels only
         # each of these are of shape (batch_size,)
         chosen_logps, rejected_logps, reasoning_logps = all_logps.split(batch_size, dim=0)
-        print(f"zihe debug shape of chosen_logps is {chosen_logps.shape}")
-        print(f"zihe debug shape of rejected_logps is {rejected_logps.shape}")
-        print(f"zihe debug shape of reasoning_logps is {reasoning_logps.shape}")
+        logger.info_rank0(f"zihe debug shape of chosen_logps is {chosen_logps.shape}")
+        logger.info_rank0(f"zihe debug shape of rejected_logps is {rejected_logps.shape}")
+        logger.info_rank0(f"zihe debug shape of reasoning_logps is {reasoning_logps.shape}")
 
         # these lengths are NOT all the same
         # chosen and rejected are the same lengths, but reasoning is a different length
         # these lengths correspond to the labels (not inputs, so excluding the prompt)
         # so these correspond to chosen_labels, rejected_labels, and reasoning_labels
         chosen_length, rejected_length, reasoning_length = valid_length.split(batch_size, dim=0)
-        print(f"zihe debug lengths are: {chosen_length},{rejected_length},{reasoning_length}")
+        logger.info_rank0(f"zihe debug lengths of stuff are: {chosen_length},{rejected_length},{reasoning_length}")
 
         # we can return alot of logps since these take up little memory
 
@@ -140,15 +144,19 @@ class CustomRDPOTrainer(CustomDPOTrainer):
                 rejected_logps,
                 reasoning_logps,
                 chosen_logps,
+                rejected_logps,
                 reasoning_logps,
             )
         # default is here, will be sigmoid
+        # normalize if neccessary
+        # these logps take up very little memory so we can return and create many of them
         else:
             return (
                 chosen_logps,
                 rejected_logps,
                 reasoning_logps,
                 chosen_logps / chosen_length,
+                rejected_logps / rejected_length,
                 reasoning_logps / reasoning_length,
             )
 
@@ -170,16 +178,17 @@ class CustomRDPOTrainer(CustomDPOTrainer):
             policy_rejected_logps,
             policy_reasoning_logps,
             policy_chosen_logps_avg,
+            policy_rejected_logps_avg,
             policy_reasoning_logps_avg,
         ) = self.concatenated_forward(model, batch)
 
         # logps of shape (batch,)
-        print(f"zihe check shape of policy chosen logps is{policy_chosen_logps.shape}")
-        print(f"zihe check shape of policy rejected logps is{policy_rejected_logps.shape}")
-        print(f"zihe check shape of policy reasoning logps is{policy_reasoning_logps.shape}")
+        logger.info_rank0(f"zihe check shape of policy chosen logps is{policy_chosen_logps.shape}")
+        logger.info_rank0(f"zihe check shape of policy rejected logps is{policy_rejected_logps.shape}")
+        logger.info_rank0(f"zihe check shape of policy reasoning logps is{policy_reasoning_logps.shape}")
         # check actual values; whether policy is same as reference
         # with lora, reference is no lora, policy is with lora
-        print(f"zihe check full policy chosen logps is{policy_chosen_logps}")
+        logger.info_rank0(f"zihe check full policy chosen logps is{policy_chosen_logps}")
 
         # Get reference log probs
         # since compute_reference_log_probs calls a method that we override,
@@ -187,9 +196,9 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         # we must be careful to keep the order of arguments to allow this to work
         reference_chosen_logps, reference_rejected_logps = self.compute_reference_log_probs(model, batch)
 
-        print(f"zihe check shape of reference chosen logps is{reference_chosen_logps.shape}")
-        print(f"zihe check full reference chosen logps is{reference_chosen_logps}")
-        print("zihe check end =========================================================")
+        logger.info_rank0(f"zihe check shape of reference chosen logps is{reference_chosen_logps.shape}")
+        logger.info_rank0(f"zihe check full reference chosen logps is{reference_chosen_logps}")
+        logger.info_rank0("zihe check end =========================================================")
 
         # Compute dpo preference loss
         # this takes in logprobs, which is already averaged over sequence
@@ -200,9 +209,10 @@ class CustomRDPOTrainer(CustomDPOTrainer):
             reference_rejected_logps,
         )
         # # check dpo loss shape, which is simply (batch,)
-        print(f"zihe check dpo loss shape is {dpo_losses.shape}")
+        logger.info_rank0(f"zihe check dpo loss shape is {dpo_losses.shape}")
 
         # not sure why this is included in default DPO implementation for LLaMA-Factory but some form of sft is included here
+        # sft on chosen logps
         # default ftx_gamma is zero
         sft_loss = -policy_chosen_logps_avg
         if self.ftx_gamma > 1e-6:
@@ -258,13 +268,13 @@ class CustomRDPOTrainer(CustomDPOTrainer):
             return None, None
 
         if self.ref_model is None:
-            print("zihe check ref model is None")
+            logger.info_rank0("zihe check ref model is None")
             # when finetuning is lora
             # the ref_model is the version without lora; disable lora adapters
             ref_model = model
             ref_context = self.accelerator.unwrap_model(model).disable_adapter()
         else:
-            print("zihe check ref model is not None")
+            logger.info_rank0("zihe check ref model is not None")
             # when finetuning is not lora (full trng)
             # this is the frozen base model
             ref_model = self.ref_model
