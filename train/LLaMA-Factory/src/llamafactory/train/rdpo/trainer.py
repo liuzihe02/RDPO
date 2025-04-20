@@ -71,7 +71,7 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         # dict keys are input_ids, attention_mask, labels
         # each dict item is a tensor of size (3*batch_size, seq_len)
         # since (chosen, rejected, reasoning) will give the 3*
-        # print(f"zihe debug batch shape is {batch['labels'].shape}")
+        print(f"zihe debug batch shape is {batch['labels'].shape}")
 
         # this may cause cuda memory issues, reduce batch size to alleviate this problem
         # this all logits_is of shape (3 * batch_size, seq_len, d_vocab)
@@ -93,8 +93,15 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         # all_logps is of shape (batch_size * 3,)
         # valid_length is of shape (batch_size * 3,)
         all_logps, valid_length = get_batch_logps(logits=all_logits, labels=batch["labels"])
-        # print(f"zihe debug shape of all_logps is {all_logps.shape}")
-        # print(f"zihe debug shape of valid_length is {valid_length.shape}")
+        print(f"zihe debug shape of all_logps is {all_logps.shape}")
+        print(f"zihe debug shape of valid_length is {valid_length.shape}")
+
+        # dont need logits here actually
+        # PLEASE REMEMBER TO REMOVE
+        chosen_logits, rejected_logits, reasoning_logits = all_logits.split(batch_size, dim=0)
+        print(f"zihe debug shape of chosen_logits is {chosen_logits.shape}")
+        print(f"zihe debug shape of rejected_logits is {rejected_logits.shape}")
+        print(f"zihe debug shape of reasoning_logits is {reasoning_logits.shape}")
 
         # here we no longer need all_logits so we free memory for this HUGE tensor
         # saves ALOT of memory!! O3 made this suggestion; I am blown away...
@@ -114,12 +121,6 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         print(f"zihe debug shape of chosen_logps is {chosen_logps.shape}")
         print(f"zihe debug shape of rejected_logps is {rejected_logps.shape}")
         print(f"zihe debug shape of reasoning_logps is {reasoning_logps.shape}")
-
-        # dont need logits here actually
-        # chosen_logits, rejected_logits, reasoning_logits = all_logits.split(batch_size, dim=0)
-        # print(f"zihe debug shape of chosen_logits is {chosen_logits.shape}")
-        # print(f"zihe debug shape of rejected_logits is {rejected_logits.shape}")
-        # print(f"zihe debug shape of reasoning_logits is {reasoning_logits.shape}")
 
         # these lengths are NOT all the same
         # chosen and rejected are the same lengths, but reasoning is a different length
@@ -199,7 +200,7 @@ class CustomRDPOTrainer(CustomDPOTrainer):
             reference_rejected_logps,
         )
         # # check dpo loss shape, which is simply (batch,)
-        # print(f"zihe check dpo loss shape is {dpo_losses.shape}")
+        print(f"zihe check dpo loss shape is {dpo_losses.shape}")
 
         # not sure why this is included in default DPO implementation for LLaMA-Factory but some form of sft is included here
         # default ftx_gamma is zero
@@ -257,13 +258,13 @@ class CustomRDPOTrainer(CustomDPOTrainer):
             return None, None
 
         if self.ref_model is None:
-            # print("zihe check ref model is None")
+            print("zihe check ref model is None")
             # when finetuning is lora
             # the ref_model is the version without lora; disable lora adapters
             ref_model = model
             ref_context = self.accelerator.unwrap_model(model).disable_adapter()
         else:
-            # print("zihe check ref model is not None")
+            print("zihe check ref model is not None")
             # when finetuning is not lora (full trng)
             # this is the frozen base model
             ref_model = self.ref_model

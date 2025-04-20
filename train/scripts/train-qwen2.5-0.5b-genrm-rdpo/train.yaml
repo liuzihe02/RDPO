@@ -56,7 +56,7 @@ overwrite_output_dir: true
 save_only_model: true
 
 ### train
-per_device_train_batch_size: 32 #may need to reduce batch size since reasoning adds more data
+per_device_train_batch_size: 4 #may need to reduce batch size since reasoning adds more data
 #stores these gradients instead of immediately updating after every batch
 #best to keep the same or increase
 gradient_accumulation_steps: 1
