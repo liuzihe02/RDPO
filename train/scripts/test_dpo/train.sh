@@ -19,7 +19,7 @@ MODEL_NAME="rdpo"
 export WANDB_RUN_NAME=$MODEL_NAME
 
 # Get config file path
-CONFIG_FILE="../scripts/test/train.yaml"
+CONFIG_FILE="../scripts/test_dpo/train.yaml"
 
 # Extract output directory from yaml file using grep with a pattern that anchors to the beginning of the line
 OUTPUT_DIR=$(grep -m1 "^output_dir:" "$CONFIG_FILE" | cut -d':' -f2 | tr -d ' ')

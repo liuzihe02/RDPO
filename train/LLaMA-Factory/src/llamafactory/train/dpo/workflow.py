@@ -59,10 +59,12 @@ def run_dpo(
         **tokenizer_module,
     )
 
-    # Create reference model
+    # use reference model
     if finetuning_args.use_ref_model:
-        if finetuning_args.ref_model is None and (not training_args.do_train):  # use the model itself
+        # eval mode will use the model itself
+        if finetuning_args.ref_model is None and (not training_args.do_train):
             ref_model = model
+        # training mode will create the base model
         else:
             ref_model = create_ref_model(model_args, finetuning_args)
     else:

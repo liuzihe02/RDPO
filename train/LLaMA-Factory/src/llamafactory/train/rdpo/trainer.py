@@ -170,6 +170,9 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         print(f"zihe check shape of policy chosen logps is{policy_chosen_logps.shape}")
         print(f"zihe check shape of policy rejected logps is{policy_rejected_logps.shape}")
         print(f"zihe check shape of policy reasoning logps is{policy_reasoning_logps.shape}")
+        # check actual values; whether policy is same as reference
+        # with lora, reference is no lora, policy is with lora
+        print(f"zihe check full policy chosen logps is{policy_chosen_logps}")
 
         # Get reference log probs
         # since compute_reference_log_probs calls a method that we override,
@@ -177,7 +180,9 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         # we must be careful to keep the order of arguments to allow this to work
         reference_chosen_logps, reference_rejected_logps = self.compute_reference_log_probs(model, batch)
 
-        # print(f"zihe check shape of reference chosen logps is{reference_chosen_logps.shape}")
+        print(f"zihe check shape of reference chosen logps is{reference_chosen_logps.shape}")
+        print(f"zihe check full reference chosen logps is{reference_chosen_logps}")
+        print("zihe check end =========================================================")
 
         # Compute dpo preference loss
         # this takes in logprobs, which is already averaged over sequence
@@ -187,7 +192,7 @@ class CustomRDPOTrainer(CustomDPOTrainer):
             reference_chosen_logps,
             reference_rejected_logps,
         )
-        # check dpo loss shape, which is simply (batch,)
+        # # check dpo loss shape, which is simply (batch,)
         # print(f"zihe check dpo loss shape is {dpo_losses.shape}")
 
         # not sure why this is included in default DPO implementation for LLaMA-Factory but some form of sft is included here

@@ -353,6 +353,8 @@ Modify `data/__init__.py` to allow `RDPOPairwiseDataCollatorWithPadding` to be s
 
 Modify the trainer to take in the RDPO loss term accordingly
 
+> Note that when LoRA is used, the reference model is simply the base model! LoRA a
+
 ### 5. Create `train/rdpo/workflow.py`
 
 Modify the `run_rdpo` in the workflow accordingly
@@ -431,7 +433,7 @@ save_only_model: true
 #for gradient checkpointing, we only store activations at certain checkpoints
 #compute them on the fly
 #this reduces memory usage but makes training slow
-# not really sure if it really helps lol
+# not really sure if it really helps lol; memory use seems the same to me
 gradient_checkpointing: true
 
 #use higher batch size for more efficiency

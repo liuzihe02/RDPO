@@ -13,7 +13,7 @@ trust_remote_code: true
 # still provide dpo here even if you use rdpo
 stage: dpo
 #IMPORTANT if you use dpo, need to specify if RDPO or not! If dont specify, just normal DPO
-rdpo: true
+rdpo: false
 #true for training, false for eval
 do_train: true
 do_eval: false
@@ -35,7 +35,7 @@ norm_reasoning: true
 
 #must exist locally, in the LlamaFactory dataset folder
 #remember to use the RDPO dataset format
-dataset: genrm_rdpo
+dataset: genrm_dpo
 #Dataset template, please ensure that the dataset template corresponds to the model.
 # though i think this is just to format the dataset questions?
 template: qwen
@@ -45,12 +45,12 @@ cutoff_len: 128
 #subset of entire training set, for experimentation
 # only use positive numbers here
 # set it to the size of the dataset
-max_samples: 1000
+max_samples: 2000
 overwrite_cache: true
 preprocessing_num_workers: 16
 
 ### output
-output_dir: output_models/train-qwen2.5-0.5b-genrm-rdpo
+output_dir: output_models/train-qwen2.5-0.5b-genrm-dpo
 logging_steps: 1
 save_steps: 100
 plot_loss: true
@@ -68,4 +68,5 @@ num_train_epochs: 1.0
 lr_scheduler_type: cosine
 warmup_ratio: 0.1
 bf16: true
+fp16: false
 ddp_timeout: 180000000
