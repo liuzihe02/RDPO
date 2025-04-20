@@ -107,14 +107,14 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         # all_logps is of shape (batch_size * 3,)
         # valid_length is of shape (batch_size * 3,)
         all_logps, valid_length = get_batch_logps(logits=all_logits, labels=batch["labels"])
-        logger.info_rank0(f"zihe debug shape of all_logps is {all_logps.shape}")
-        logger.info_rank0(f"zihe debug shape of valid_length is {valid_length.shape}")
-
         # here we no longer need all_logits so we free memory for this HUGE tensor
         # saves ALOT of memory!! O3 made this suggestion; I am blown away...
         # but peak memory is still high, memory tends to fluctuate much more
         del all_logits
         torch.cuda.empty_cache()
+
+        logger.info_rank0(f"zihe debug shape of all_logps is {all_logps.shape}")
+        logger.info_rank0(f"zihe debug shape of valid_length is {valid_length.shape}")
 
         if self.loss_type in ["ipo", "orpo", "simpo"]:
             all_logps = all_logps / valid_length
