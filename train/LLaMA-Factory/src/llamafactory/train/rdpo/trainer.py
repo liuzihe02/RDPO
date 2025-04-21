@@ -289,7 +289,7 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         # with torch.no_grad(), ref_context:
         # use inference mode to skip autograd and free buffer quicker
         # also use autocast to force bf16
-        with torch.inference_mode(), ref_context, torch.cuda.amp.autocast(dtype=torch.bfloat16):
+        with torch.no_grad(), ref_context, torch.cuda.amp.autocast(dtype=torch.bfloat16):
             reference_chosen_logps, reference_rejected_logps, *_ = self.concatenated_forward(ref_model, batch)
 
         return reference_chosen_logps, reference_rejected_logps
