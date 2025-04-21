@@ -21,14 +21,14 @@ do_eval: false
 finetuning_type: full
 # lora_rank: 1
 # lora_target: all
-deepspeed: examples/deepspeed/ds_z2_offload_config.json # choices: [ds_z0_config.json, ds_z2_config.json, ds_z3_config.json]
+deepspeed: examples/deepspeed/ds_z3_offload_config.json # choices: [ds_z0_config.json, ds_z2_config.json, ds_z3_config.json]
 pref_beta: 0.1
 pref_loss: sigmoid # choices: [sigmoid (dpo), orpo, simpo]
 
 #the hyperparam for our RDPO loss
 # may need some investigation here to see the tuning for this
 reasoning_weight: 0.5
-#divide by length of reasoning prompt
+#divide reasoning logps by length of reasoning prompt
 norm_reasoning: true
 
 ### dataset
@@ -41,7 +41,7 @@ dataset: genrm_rdpo
 template: qwen
 #this can significantly affect cuda memory use; reduce this if memory problems too much
 # for rdpo, text is doubled so memory issues more prevalent
-cutoff_len: 64
+cutoff_len: 1408
 #subset of entire training set, for experimentation
 # only use positive numbers here
 # set it to the size of the dataset
@@ -58,7 +58,7 @@ overwrite_output_dir: true
 save_only_model: true
 
 ### train
-per_device_train_batch_size: 2 #may need to reduce batch size since reasoning adds more data
+per_device_train_batch_size: 16 #may need to reduce batch size since reasoning adds more data
 #stores these gradients instead of immediately updating after every batch
 #best to keep the same or increase
 gradient_accumulation_steps: 1
