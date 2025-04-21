@@ -75,11 +75,11 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         # first third is chosen, next third is rejected, last third is reasoning
         batch_size = batch["input_ids"].size(0) // 3
 
-        # this batch will be a dictionary of stuff decided in data_collator.py
-        # dict keys are input_ids, attention_mask, labels
-        # each dict item is a tensor of size (3*batch_size, seq_len)
-        # since (chosen, rejected, reasoning) will give the 3*
-        logger.info_rank0(f"zihe debug batch shape is {batch['labels'].shape}")
+        # # this batch will be a dictionary of stuff decided in data_collator.py
+        # # dict keys are input_ids, attention_mask, labels
+        # # each dict item is a tensor of size (3*batch_size, seq_len)
+        # # since (chosen, rejected, reasoning) will give the 3*
+        # logger.info_rank0(f"zihe debug batch shape is {batch['labels'].shape}")
 
         # this may cause cuda memory issues, reduce batch size to alleviate this problem
         # this all logits_is of shape (3 * batch_size, seq_len, d_vocab)
@@ -113,8 +113,9 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         del all_logits
         torch.cuda.empty_cache()
 
-        logger.info_rank0(f"zihe debug shape of all_logps is {all_logps.shape}")
-        logger.info_rank0(f"zihe debug shape of valid_length is {valid_length.shape}")
+        # these are of shape (3*batch_size)
+        # logger.info_rank0(f"zihe debug shape of all_logps is {all_logps.shape}")
+        # logger.info_rank0(f"zihe debug shape of valid_length is {valid_length.shape}")
 
         if self.loss_type in ["ipo", "orpo", "simpo"]:
             all_logps = all_logps / valid_length
@@ -188,7 +189,7 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         # logger.info_rank0(f"zihe check shape of policy reasoning logps is{policy_reasoning_logps.shape}")
         # # check actual values; whether policy is same as reference
         # # with lora, reference is no lora, policy is with lora
-        # logger.info_rank0(f"zihe check full policy chosen logps is{policy_chosen_logps}")
+        logger.info_rank0(f"zihe check full policy chosen logps is{policy_chosen_logps}")
 
         # Get reference log probs
         # since compute_reference_log_probs calls a method that we override,
@@ -196,7 +197,7 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         # we must be careful to keep the order of arguments to allow this to work
         reference_chosen_logps, reference_rejected_logps = self.compute_reference_log_probs(model, batch)
 
-        logger.info_rank0(f"zihe check shape of reference chosen logps is{reference_chosen_logps.shape}")
+        # logger.info_rank0(f"zihe check shape of reference chosen logps is{reference_chosen_logps.shape}")
         logger.info_rank0(f"zihe check full reference chosen logps is{reference_chosen_logps}")
         logger.info_rank0("zihe check end =========================================================")
 
@@ -208,8 +209,8 @@ class CustomRDPOTrainer(CustomDPOTrainer):
             reference_chosen_logps,
             reference_rejected_logps,
         )
-        # # check dpo loss shape, which is simply (batch,)
-        logger.info_rank0(f"zihe check dpo loss shape is {dpo_losses.shape}")
+        # # # check dpo loss shape, which is simply (batch,)
+        # logger.info_rank0(f"zihe check dpo loss shape is {dpo_losses.shape}")
 
         # not sure why this is included in default DPO implementation for LLaMA-Factory but some form of sft is included here
         # sft on chosen logps
