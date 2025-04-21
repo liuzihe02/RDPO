@@ -132,7 +132,7 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         # these lengths correspond to the labels (not inputs, so excluding the prompt)
         # so these correspond to chosen_labels, rejected_labels, and reasoning_labels
         chosen_length, rejected_length, reasoning_length = valid_length.split(batch_size, dim=0)
-        logger.info_rank0(f"zihe debug lengths of stuff are: {chosen_length},{rejected_length},{reasoning_length}")
+        # logger.info_rank0(f"zihe debug lengths of stuff are: {chosen_length},{rejected_length},{reasoning_length}")
 
         # we can return alot of logps since these take up little memory
 
@@ -189,7 +189,7 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         # logger.info_rank0(f"zihe check shape of policy reasoning logps is{policy_reasoning_logps.shape}")
         # # check actual values; whether policy is same as reference
         # # with lora, reference is no lora, policy is with lora
-        logger.info_rank0(f"zihe check full policy chosen logps is{policy_chosen_logps}")
+        # logger.info_rank0(f"zihe check full policy chosen logps is{policy_chosen_logps}")
 
         # Get reference log probs
         # since compute_reference_log_probs calls a method that we override,
@@ -198,8 +198,7 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         reference_chosen_logps, reference_rejected_logps = self.compute_reference_log_probs(model, batch)
 
         # logger.info_rank0(f"zihe check shape of reference chosen logps is{reference_chosen_logps.shape}")
-        logger.info_rank0(f"zihe check full reference chosen logps is{reference_chosen_logps}")
-        logger.info_rank0("zihe check end =========================================================")
+        # logger.info_rank0(f"zihe check full reference chosen logps is{reference_chosen_logps}")
 
         # Compute dpo preference loss
         # this takes in logprobs, which is already averaged over sequence
@@ -269,13 +268,13 @@ class CustomRDPOTrainer(CustomDPOTrainer):
             return None, None
 
         if self.ref_model is None:
-            logger.info_rank0("zihe check ref model is None")
+            # logger.info_rank0("zihe check ref model is None")
             # when finetuning is lora
             # the ref_model is the version without lora; disable lora adapters
             ref_model = model
             ref_context = self.accelerator.unwrap_model(model).disable_adapter()
         else:
-            logger.info_rank0("zihe check ref model is not None")
+            # logger.info_rank0("zihe check ref model is not None")
             # when finetuning is not lora (full trng)
             # this is the frozen base model
             ref_model = self.ref_model
@@ -286,9 +285,7 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         # if getattr(ref_model, "gradient_checkpointing", False):
         #     ref_model.gradient_checkpointing_disable()
 
-        # with torch.no_grad(), ref_context:
-        # use inference mode to skip autograd and free buffer quicker
-        # also use autocast to force bf16
+        # do not use inference mode here as itll cause errors
         with torch.no_grad(), ref_context, torch.cuda.amp.autocast(dtype=torch.bfloat16):
             reference_chosen_logps, reference_rejected_logps, *_ = self.concatenated_forward(ref_model, batch)
 
