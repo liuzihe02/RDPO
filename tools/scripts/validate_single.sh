@@ -17,18 +17,15 @@ CURRENT_DIR=$(pwd)
 
 #cd to the evaluate_math folder
 cd ../evaluate_math
-
-
-TOKENIZERS_PARALLELISM=false \
 # need to use absolute paths here as we've changed directory
-
-#remember to activate vllm
 
 #max_tokens_per_call is how many we allow to generate; default 2048
 #this is also how many we allow as input
 
 #we also added use_safetensors
-python3 -u math_eval.py \
+#remember to activate vllm
+# set tokenizer parallelism false for this eval run
+TOKENIZERS_PARALLELISM=false python3 -u math_eval.py \
     --model_name_or_path ${CURRENT_DIR}/${MODEL_NAME_OR_PATH} \
     --data_name ${DATA_NAME} \
     --output_dir ${CURRENT_DIR}/${OUTPUT_DIR}  \
