@@ -11,6 +11,7 @@ from transformers import Trainer
 from trl import DPOTrainer
 from trl.trainer import disable_dropout_in_model
 from typing_extensions import override
+from transformers.utils import is_flash_attn_2_available, is_torch_sdpa_available
 
 from ...extras import logging
 from ...extras.constants import IGNORE_INDEX
@@ -18,6 +19,7 @@ from ...extras.packages import is_transformers_version_greater_than
 from ..dpo.trainer import CustomDPOTrainer
 from ..callbacks import SaveProcessorCallback
 from ..trainer_utils import create_custom_optimizer, create_custom_scheduler, get_batch_logps, nested_detach
+from ...model.model_utils.attention import print_attn_implementation
 
 if TYPE_CHECKING:
     from transformers import PreTrainedModel, ProcessorMixin
@@ -41,140 +43,6 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         super().__init__(model, ref_model, finetuning_args, processor, disable_dropout, **kwargs)
         self.reasoning_weight = finetuning_args.reasoning_weight
 
-    # @override
-    # def concatenated_forward(
-    #     self, model: "PreTrainedModel", batch: Dict[str, "torch.Tensor"]
-    # ) -> Tuple[
-    #     "torch.Tensor",
-    #     "torch.Tensor",
-    #     "torch.Tensor",
-    #     "torch.Tensor",
-    #     "torch.Tensor",
-    #     "torch.Tensor",
-    # ]:
-    #     r"""
-    #     Computes the sum log probabilities of the labels under given logits if loss_type is not IPO, ORPO or SimPO.
-
-    #     THIS PROCESSES ALL CHOSEN REJECTED REASONING ALL AT ONCE; CAUSES ALOT OF OUT-OF-MEMORY ERRORS
-
-    #     this splits up a batch tensor into the relevant stuff
-
-    #     note that this includes a reasoning column for the third column
-
-    #     Otherwise the average log probabilities.
-
-    #     the batch here already contains logits for chosen, rejected, reasoning
-    #     the way this is structured is defined in RDPOPairwiseDataCollatorWithPadding
-
-    #     DO NOT RETURN THE LOGITS AS THIS TAKES UP ALOT OF MEMORY
-    #     let garbage collector to its work
-    #     logits of shape (batch, sequence, d_vocab) so for a large d_vocab, this is a very big tensor of a few Gbs
-    #     """
-    #     if self.finetuning_args.use_ref_model:
-    #         batch = nested_detach(batch, clone=True)  # avoid error
-
-    #     # reset peak memory stats
-    #     torch.cuda.reset_peak_memory_stats()
-    #     self.profile_memory("Initial")
-
-    #     # split into 3 parts along the first dimension
-    #     # first third is chosen, next third is rejected, last third is reasoning
-    #     batch_size = batch["input_ids"].size(0) // 3
-
-    #     # # this batch will be a dictionary of stuff decided in data_collator.py
-    #     # # dict keys are input_ids, attention_mask, labels
-    #     # # each dict item is a tensor of size (3*batch_size, seq_len)
-    #     # # since (chosen, rejected, reasoning) will give the 3*
-    #     # logger.info_rank0(f"zihe debug batch shape is {batch['labels'].shape}")
-
-    #     # this may cause cuda memory issues, reduce batch size to alleviate this problem
-    #     # this all logits_is of shape (3 * batch_size, seq_len, d_vocab)
-
-    #     # keep the data format as is
-    #     # THIS IS THE MAIN MEMORY BOTTLENECK
-    #     all_logits = model(**batch, return_dict=True, use_cache=False).logits
-
-    #     self.profile_memory("After loading logits")
-
-    #     # Only convert if you really need it you really need later, not the full 3‑D tensor
-    #     if self.loss_type in {"ipo", "orpo", "simpo"}:  # these need FP32 division later
-    #         all_logits = all_logits.float()
-
-    #     # # dont need logits here actually
-    #     # # PLEASE REMEMBER TO REMOVE
-    #     # chosen_logits, rejected_logits, reasoning_logits = all_logits.split(batch_size, dim=0)
-    #     # logger.info_rank0(f"zihe debug shape of chosen_logits is {chosen_logits.shape}")
-    #     # logger.info_rank0(f"zihe debug shape of rejected_logits is {rejected_logits.shape}")
-    #     # logger.info_rank0(f"zihe debug shape of reasoning_logits is {reasoning_logits.shape}")
-
-    #     # logger.info_rank0(f"zihe debug shape of all logits is {all_logits.shape}")
-
-    #     # # in the original llamafactory code, they upcast to float32 - massive memory consumption!!
-    #     # # our method keeps the data type of bf16 and almost halves the memory
-
-    #     # this is for labels only
-    #     # all_logps is of shape (batch_size * 3,)
-    #     # valid_length is of shape (batch_size * 3,)
-    #     all_logps, valid_length = get_batch_logps(logits=all_logits, labels=batch["labels"])
-    #     # here we no longer need all_logits so we free memory for this HUGE tensor
-    #     # saves ALOT of memory!! O3 made this suggestion; I am blown away...
-    #     # but peak memory is still high, memory tends to fluctuate much more
-
-    #     self.profile_memory("After getting logps")
-
-    #     del all_logits, batch
-    #     torch.cuda.empty_cache()
-
-    #     self.profile_memory("After deleting logits and batch")
-
-    #     # these are of shape (3*batch_size)
-    #     # logger.info_rank0(f"zihe debug shape of all_logps is {all_logps.shape}")
-    #     # logger.info_rank0(f"zihe debug shape of valid_length is {valid_length.shape}")
-
-    #     if self.loss_type in ["ipo", "orpo", "simpo"]:
-    #         all_logps = all_logps / valid_length
-
-    #     # i believe the following is the logits/logps for labels only
-    #     # each of these are of shape (batch_size,)
-    #     chosen_logps, rejected_logps, reasoning_logps = all_logps.split(batch_size, dim=0)
-    #     # logger.info_rank0(f"zihe debug shape of chosen_logps is {chosen_logps.shape}")
-    #     # logger.info_rank0(f"zihe debug shape of rejected_logps is {rejected_logps.shape}")
-    #     # logger.info_rank0(f"zihe debug shape of reasoning_logps is {reasoning_logps.shape}")
-
-    #     # these lengths are NOT all the same
-    #     # chosen and rejected are the same lengths, but reasoning is a different length
-    #     # these lengths correspond to the labels (not inputs, so excluding the prompt)
-    #     # so these correspond to chosen_labels, rejected_labels, and reasoning_labels
-    #     chosen_length, rejected_length, reasoning_length = valid_length.split(batch_size, dim=0)
-    #     # logger.info_rank0(f"zihe debug lengths of stuff are: {chosen_length},{rejected_length},{reasoning_length}")
-
-    #     # we can return alot of logps since these take up little memory
-
-    #     # default loss is sigmoid here
-    #     # last one is a normalized chosen_logps
-    #     if self.loss_type in ["ipo", "orpo", "simpo"]:
-    #         # order of first 2, the chosen and rejected logps must stay the same
-    #         return (
-    #             chosen_logps,
-    #             rejected_logps,
-    #             reasoning_logps,
-    #             chosen_logps,
-    #             rejected_logps,
-    #             reasoning_logps,
-    #         )
-    #     # default is here, will be sigmoid
-    #     # normalize if neccessary
-    #     # these logps take up very little memory so we can return and create many of them
-    #     else:
-    #         return (
-    #             chosen_logps,
-    #             rejected_logps,
-    #             reasoning_logps,
-    #             chosen_logps / chosen_length,
-    #             rejected_logps / rejected_length,
-    #             reasoning_logps / reasoning_length,
-    #         )
-
     @override
     def concatenated_forward(
         self, model: "PreTrainedModel", batch: Dict[str, "torch.Tensor"]
@@ -186,66 +54,111 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         "torch.Tensor",
         "torch.Tensor",
     ]:
-        """
-        Computes log probabilities by processing chosen, rejected, and reasoning in THREE SEPARATE PASSES
-        to reduce peak memory usage while maintaining PyTorch vectorization.
+        r"""
+        Computes the sum log probabilities of the labels under given logits if loss_type is not IPO, ORPO or SimPO.
 
-        essentially THE SAME as the above commented out concat_forward but processing the chosen, rejected, reasoning separately
+        THIS PROCESSES ALL CHOSEN REJECTED REASONING ALL AT ONCE; CAUSES ALOT OF OUT-OF-MEMORY ERRORS
+
+        this splits up a batch tensor into the relevant stuff
+
+        note that this includes a reasoning column for the third column
+
+        Otherwise the average log probabilities.
+
+        the batch here already contains logits for chosen, rejected, reasoning
+        the way this is structured is defined in RDPOPairwiseDataCollatorWithPadding
+
+        DO NOT RETURN THE LOGITS AS THIS TAKES UP ALOT OF MEMORY
+        let garbage collector to its work
+        logits of shape (batch, sequence, d_vocab) so for a large d_vocab, this is a very big tensor of a few Gbs
         """
+
+        # print("attention fa2", is_flash_attn_2_available(), "attention sdpa", is_torch_sdpa_available())
+
         if self.finetuning_args.use_ref_model:
             batch = nested_detach(batch, clone=True)  # avoid error
 
-        # reset peak memory stats
-        torch.cuda.reset_peak_memory_stats()
-        self.profile_memory("Initial")
+        # # reset peak memory stats
+        # torch.cuda.reset_peak_memory_stats()
+        # self.profile_memory("Initial")
 
-        # Calculate batch size for each component
+        # split into 3 parts along the first dimension
+        # first third is chosen, next third is rejected, last third is reasoning
         batch_size = batch["input_ids"].size(0) // 3
 
-        # Create batches for each component
-        chosen_batch = {k: v[:batch_size] for k, v in batch.items()}
-        rejected_batch = {k: v[batch_size : 2 * batch_size] for k, v in batch.items()}
-        reasoning_batch = {k: v[2 * batch_size :] for k, v in batch.items()}
+        # # this batch will be a dictionary of stuff decided in data_collator.py
+        # # dict keys are input_ids, attention_mask, labels
+        # # each dict item is a tensor of size (3*batch_size, seq_len)
+        # # since (chosen, rejected, reasoning) will give the 3*
+        # logger.info_rank0(f"zihe debug batch shape is {batch['labels'].shape}")
 
-        # --- chosen + rejected (no gradient reduction yet)
-        # if you try to process all through, there will be an error where we update gradients 3 times
-        # defer updates for the chosen and rejected, only update after reasoning
+        # this may cause cuda memory issues, reduce batch size to alleviate this problem
+        # this all logits_is of shape (3 * batch_size, seq_len, d_vocab)
 
-        chosen_logits = model(**chosen_batch, return_dict=True, use_cache=False).logits
-        chosen_logps, chosen_length = get_batch_logps(logits=chosen_logits, labels=chosen_batch["labels"])
-        del chosen_logits, chosen_batch
+        # keep the data format as is
+        # THIS IS THE MAIN MEMORY BOTTLENECK
+        all_logits = model(**batch, return_dict=True, use_cache=False).logits
 
-        # Forcing tensor detachment to break computational graph between passes
-        # need this otherwise will cause errors
-        chosen_logps = chosen_logps.detach().clone().requires_grad_(model.training)
-        chosen_length = chosen_length.detach().clone()
+        # self.profile_memory("After loading logits")
+
+        # Only convert if you really need it you really need later, not the full 3‑D tensor
+        if self.loss_type in {"ipo", "orpo", "simpo"}:  # these need FP32 division later
+            all_logits = all_logits.float()
+
+        # # dont need logits here actually
+        # # PLEASE REMEMBER TO REMOVE
+        # chosen_logits, rejected_logits, reasoning_logits = all_logits.split(batch_size, dim=0)
+        # logger.info_rank0(f"zihe debug shape of chosen_logits is {chosen_logits.shape}")
+        # logger.info_rank0(f"zihe debug shape of rejected_logits is {rejected_logits.shape}")
+        # logger.info_rank0(f"zihe debug shape of reasoning_logits is {reasoning_logits.shape}")
+
+        # logger.info_rank0(f"zihe debug shape of all logits is {all_logits.shape}")
+
+        # # in the original llamafactory code, they upcast to float32 - massive memory consumption!!
+        # # our method keeps the data type of bf16 and almost halves the memory
+
+        # this is for labels only
+        # all_logps is of shape (batch_size * 3,)
+        # valid_length is of shape (batch_size * 3,)
+        all_logps, valid_length = get_batch_logps(logits=all_logits, labels=batch["labels"])
+        # here we no longer need all_logits so we free memory for this HUGE tensor
+        # saves ALOT of memory!! O3 made this suggestion; I am blown away...
+        # but peak memory is still high, memory tends to fluctuate much more
+
+        # self.profile_memory("After getting logps")
+
+        del all_logits, batch
         torch.cuda.empty_cache()
 
-        self.profile_memory("After processing chosen")
+        # self.profile_memory("After deleting logits and batch")
 
-        # Process rejected responses
-        rejected_logits = model(**rejected_batch, return_dict=True, use_cache=False).logits
-        rejected_logps, rejected_length = get_batch_logps(logits=rejected_logits, labels=rejected_batch["labels"])
-        del rejected_logits, rejected_batch
+        # these are of shape (3*batch_size)
+        # logger.info_rank0(f"zihe debug shape of all_logps is {all_logps.shape}")
+        # logger.info_rank0(f"zihe debug shape of valid_length is {valid_length.shape}")
 
-        # Forcing tensor detachment to break computational graph between passes
-        rejected_logps = rejected_logps.detach().clone().requires_grad_(model.training)
-        rejected_length = rejected_length.detach().clone()
-        torch.cuda.empty_cache()
-
-        self.profile_memory("After processing rejected")
-
-        # Process reasoning responses
-        reasoning_logits = model(**reasoning_batch, return_dict=True, use_cache=False).logits
-        reasoning_logps, reasoning_length = get_batch_logps(logits=reasoning_logits, labels=reasoning_batch["labels"])
-        del reasoning_logits, reasoning_batch
-        # dont detach this as we will do our backprop here
-        torch.cuda.empty_cache()
-
-        self.profile_memory("After processing reasoning")
-
-        # Return appropriate values based on loss type
         if self.loss_type in ["ipo", "orpo", "simpo"]:
+            all_logps = all_logps / valid_length
+
+        # i believe the following is the logits/logps for labels only
+        # each of these are of shape (batch_size,)
+        chosen_logps, rejected_logps, reasoning_logps = all_logps.split(batch_size, dim=0)
+        # logger.info_rank0(f"zihe debug shape of chosen_logps is {chosen_logps.shape}")
+        # logger.info_rank0(f"zihe debug shape of rejected_logps is {rejected_logps.shape}")
+        # logger.info_rank0(f"zihe debug shape of reasoning_logps is {reasoning_logps.shape}")
+
+        # these lengths are NOT all the same
+        # chosen and rejected are the same lengths, but reasoning is a different length
+        # these lengths correspond to the labels (not inputs, so excluding the prompt)
+        # so these correspond to chosen_labels, rejected_labels, and reasoning_labels
+        chosen_length, rejected_length, reasoning_length = valid_length.split(batch_size, dim=0)
+        # logger.info_rank0(f"zihe debug lengths of stuff are: {chosen_length},{rejected_length},{reasoning_length}")
+
+        # we can return alot of logps since these take up little memory
+
+        # default loss is sigmoid here
+        # last one is a normalized chosen_logps
+        if self.loss_type in ["ipo", "orpo", "simpo"]:
+            # order of first 2, the chosen and rejected logps must stay the same
             return (
                 chosen_logps,
                 rejected_logps,
@@ -254,6 +167,9 @@ class CustomRDPOTrainer(CustomDPOTrainer):
                 rejected_logps,
                 reasoning_logps,
             )
+        # default is here, will be sigmoid
+        # normalize if neccessary
+        # these logps take up very little memory so we can return and create many of them
         else:
             return (
                 chosen_logps,
@@ -286,7 +202,7 @@ class CustomRDPOTrainer(CustomDPOTrainer):
             policy_reasoning_logps_avg,
         ) = self.concatenated_forward(model, batch)
 
-        self.profile_memory("After concat forward")
+        # self.profile_memory("After concat forward")
 
         # # logps of shape (batch,)
         # logger.info_rank0(f"zihe check shape of policy chosen logps is{policy_chosen_logps.shape}")
@@ -302,7 +218,7 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         # we must be careful to keep the order of arguments to allow this to work
         reference_chosen_logps, reference_rejected_logps = self.compute_reference_log_probs(model, batch)
 
-        self.profile_memory("After computing ref logprobs")
+        # self.profile_memory("After computing ref logprobs")
 
         # logger.info_rank0(f"zihe check shape of reference chosen logps is{reference_chosen_logps.shape}")
         # logger.info_rank0(f"zihe check full reference chosen logps is{reference_chosen_logps}")
@@ -362,7 +278,7 @@ class CustomRDPOTrainer(CustomDPOTrainer):
             metrics[f"{prefix}sft_loss"] = sft_loss.mean().item()
             metrics[f"{prefix}odds_ratio_loss"] = ((dpo_losses - sft_loss) / self.beta).mean().item()
 
-        self.profile_memory("End - computed all losses")
+        # self.profile_memory("End - computed all losses")
 
         return combined_losses, metrics
 
