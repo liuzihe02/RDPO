@@ -463,6 +463,8 @@ warmup_ratio: 0.1
 #keep bf16 to reduce unneccessary conversions
 bf16: true
 ddp_timeout: 180000000
+# select sdpa or fa2, fa2 is much faster but you need to download flash-attn first
+flash_attn: fa2
 ```
 
 Note that the hyperparameters here are defined in **both** `src/llamafactory/hparams` and the transformers package `.venv/lib64/python3.10/site-packages/transformers/training_args.py`

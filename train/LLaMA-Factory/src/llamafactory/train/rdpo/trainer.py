@@ -73,7 +73,7 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         logits of shape (batch, sequence, d_vocab) so for a large d_vocab, this is a very big tensor of a few Gbs
         """
 
-        print("attention fa2", is_flash_attn_2_available(), "attention sdpa", is_torch_sdpa_available())
+        # print("attention fa2", is_flash_attn_2_available(), "attention sdpa", is_torch_sdpa_available())
 
         if self.finetuning_args.use_ref_model:
             batch = nested_detach(batch, clone=True)  # avoid error
