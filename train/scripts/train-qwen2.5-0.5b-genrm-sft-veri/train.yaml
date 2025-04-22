@@ -33,7 +33,7 @@ overwrite_output_dir: true
 save_only_model: true
 
 ### train
-per_device_train_batch_size: 10
+per_device_train_batch_size: 6
 #stores these gradients instead of immediately updating after every batch
 #best to keep the same or increase
 gradient_checkpointing: true
