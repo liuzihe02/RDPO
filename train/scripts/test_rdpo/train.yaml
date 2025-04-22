@@ -21,7 +21,7 @@ do_eval: false
 finetuning_type: lora
 lora_rank: 1
 lora_target: all
-deepspeed: examples/deepspeed/ds_z2_offload_config.json # choices: [ds_z0_config.json, ds_z2_config.json, ds_z3_config.json]
+deepspeed: examples/deepspeed/ds_z2_config.json # choices: [ds_z0_config.json, ds_z2_config.json, ds_z3_config.json]
 pref_beta: 0.1
 pref_loss: sigmoid # choices: [sigmoid (dpo), orpo, simpo]
 
@@ -70,3 +70,4 @@ warmup_ratio: 0.1
 bf16: true
 fp16: false
 ddp_timeout: 180000000
+#use BAdam as i think my optimizer is taking up too much memory

@@ -3,6 +3,7 @@ from collections import defaultdict
 from contextlib import nullcontext
 from types import MethodType
 from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Tuple, Union
+import os
 
 import torch
 import torch.nn.functional as F
@@ -71,6 +72,10 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         if self.finetuning_args.use_ref_model:
             batch = nested_detach(batch, clone=True)  # avoid error
 
+        # reset peak memory stats
+        torch.cuda.reset_peak_memory_stats()
+        self.profile_memory("Initial")
+
         # split into 3 parts along the first dimension
         # first third is chosen, next third is rejected, last third is reasoning
         batch_size = batch["input_ids"].size(0) // 3
@@ -86,6 +91,8 @@ class CustomRDPOTrainer(CustomDPOTrainer):
 
         # keep the data format as is
         all_logits = model(**batch, return_dict=True, use_cache=False).logits
+
+        self.profile_memory("After loading logits")
 
         # Only convert if you really need it you really need later, not the full 3‑D tensor
         if self.loss_type in {"ipo", "orpo", "simpo"}:  # these need FP32 division later
@@ -110,8 +117,13 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         # here we no longer need all_logits so we free memory for this HUGE tensor
         # saves ALOT of memory!! O3 made this suggestion; I am blown away...
         # but peak memory is still high, memory tends to fluctuate much more
+
+        self.profile_memory("After getting logps")
+
         del all_logits
         torch.cuda.empty_cache()
+
+        self.profile_memory("After deleting logits")
 
         # these are of shape (3*batch_size)
         # logger.info_rank0(f"zihe debug shape of all_logps is {all_logps.shape}")
@@ -183,6 +195,8 @@ class CustomRDPOTrainer(CustomDPOTrainer):
             policy_reasoning_logps_avg,
         ) = self.concatenated_forward(model, batch)
 
+        self.profile_memory("After concat forward")
+
         # # logps of shape (batch,)
         # logger.info_rank0(f"zihe check shape of policy chosen logps is{policy_chosen_logps.shape}")
         # logger.info_rank0(f"zihe check shape of policy rejected logps is{policy_rejected_logps.shape}")
@@ -196,6 +210,8 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         # which is concatenated_forward
         # we must be careful to keep the order of arguments to allow this to work
         reference_chosen_logps, reference_rejected_logps = self.compute_reference_log_probs(model, batch)
+
+        self.profile_memory("After computing ref logprobs")
 
         # logger.info_rank0(f"zihe check shape of reference chosen logps is{reference_chosen_logps.shape}")
         # logger.info_rank0(f"zihe check full reference chosen logps is{reference_chosen_logps}")
@@ -255,6 +271,8 @@ class CustomRDPOTrainer(CustomDPOTrainer):
             metrics[f"{prefix}sft_loss"] = sft_loss.mean().item()
             metrics[f"{prefix}odds_ratio_loss"] = ((dpo_losses - sft_loss) / self.beta).mean().item()
 
+        self.profile_memory("End - computed all losses")
+
         return combined_losses, metrics
 
     @override
@@ -290,3 +308,30 @@ class CustomRDPOTrainer(CustomDPOTrainer):
             reference_chosen_logps, reference_rejected_logps, *_ = self.concatenated_forward(ref_model, batch)
 
         return reference_chosen_logps, reference_rejected_logps
+
+    # Add this to your CustomDPOTrainer class, perhaps in the get_batch_loss_metrics method
+    def profile_memory(self, label=""):
+        r"""this is my function to debug whats going on"""
+        # needed to sync gpu and cpu for accurate profiling
+        torch.cuda.synchronize()
+        # check if this is the global main process
+        if torch.cuda.is_available() and self.is_world_process_zero():
+            print(f"=== Memory Stats ({label}) ===")
+            # check which device were using
+            # print(f"[rank {torch.dist.get_rank()}]")
+            print(f"Allocated: {torch.cuda.memory_allocated() / 1024**3:.2f} GB")
+            # current memory cached
+            print(f"Reserved: {torch.cuda.memory_reserved() / 1024**3:.2f} GB")
+            # returns peak allocation since the beginning of the program
+            print(f"Max Allocated: {torch.cuda.max_memory_allocated() / 1024**3:.2f} GB")
+            print(f"Max Reserved: {torch.cuda.max_memory_reserved() / 1024**3:.2f} GB")
+            print("======")
+
+            # More detailed memory snapshot
+            print(torch.cuda.memory_summary(abbreviated=True))
+            # # for all devices
+            # cuda_devices_str = os.environ.get("CUDA_VISIBLE_DEVICES", "")
+            # # as a list of integers
+            # cuda_devices = [int(device) for device in cuda_devices_str.split(",")]
+            # for dev_id in cuda_devices:
+            #     print(torch.cuda.list_gpu_processes(device=dev_id))
