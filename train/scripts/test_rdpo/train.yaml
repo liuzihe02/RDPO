@@ -70,4 +70,3 @@ warmup_ratio: 0.1
 bf16: true
 fp16: false
 ddp_timeout: 180000000
-#use BAdam as i think my optimizer is taking up too much memory
