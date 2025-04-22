@@ -189,6 +189,8 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         """
         Computes log probabilities by processing chosen, rejected, and reasoning in THREE SEPARATE PASSES
         to reduce peak memory usage while maintaining PyTorch vectorization.
+
+        essentially THE SAME as the above commented out concat_forward but processing the chosen, rejected, reasoning separately
         """
         if self.finetuning_args.use_ref_model:
             batch = nested_detach(batch, clone=True)  # avoid error
@@ -205,26 +207,39 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         rejected_batch = {k: v[batch_size : 2 * batch_size] for k, v in batch.items()}
         reasoning_batch = {k: v[2 * batch_size :] for k, v in batch.items()}
 
-        # Process chosen responses
-        chosen_logits = model(**chosen_batch, return_dict=True, use_cache=False).logits
-        chosen_logps, chosen_length = get_batch_logps(logits=chosen_logits, labels=chosen_batch["labels"])
-        del chosen_logits, chosen_batch
-        torch.cuda.empty_cache()
+        # --- chosen + rejected (no gradient reduction yet)
+        # if you try to process all through, there will be an error where we update gradients 3 times
+        # defer updates for the chosen and rejected, only update after reasoning
+        with self.accelerator.no_sync(model):
+            chosen_logits = model(**chosen_batch, return_dict=True, use_cache=False).logits
+            chosen_logps, chosen_length = get_batch_logps(logits=chosen_logits, labels=chosen_batch["labels"])
+            del chosen_logits, chosen_batch
 
-        self.profile_memory("After processing chosen")
+            # Forcing tensor detachment to break computational graph between passes
+            # need this otherwise will cause errors
+            chosen_logps = chosen_logps.detach().clone().requires_grad_(model.training)
+            chosen_length = chosen_length.detach().clone()
+            torch.cuda.empty_cache()
 
-        # Process rejected responses
-        rejected_logits = model(**rejected_batch, return_dict=True, use_cache=False).logits
-        rejected_logps, rejected_length = get_batch_logps(logits=rejected_logits, labels=rejected_batch["labels"])
-        del rejected_logits, rejected_batch
-        torch.cuda.empty_cache()
+            self.profile_memory("After processing chosen")
 
-        self.profile_memory("After processing rejected")
+            # Process rejected responses
+            rejected_logits = model(**rejected_batch, return_dict=True, use_cache=False).logits
+            rejected_logps, rejected_length = get_batch_logps(logits=rejected_logits, labels=rejected_batch["labels"])
+            del rejected_logits, rejected_batch
+
+            # Forcing tensor detachment to break computational graph between passes
+            rejected_logps = rejected_logps.detach().clone().requires_grad_(model.training)
+            rejected_length = rejected_length.detach().clone()
+            torch.cuda.empty_cache()
+
+            self.profile_memory("After processing rejected")
 
         # Process reasoning responses
         reasoning_logits = model(**reasoning_batch, return_dict=True, use_cache=False).logits
         reasoning_logps, reasoning_length = get_batch_logps(logits=reasoning_logits, labels=reasoning_batch["labels"])
         del reasoning_logits, reasoning_batch
+        # dont detach this as we will do our backprop here
         torch.cuda.empty_cache()
 
         self.profile_memory("After processing reasoning")
