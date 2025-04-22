@@ -42,7 +42,7 @@ train/LLaMA-Factory/output_models/**/*
 !train/LLaMA-Factory/output_models/**/*log*
 !train/LLaMA-Factory/output_models/**/*state*
 !train/LLaMA-Factory/output_models/**/*result*
-
+!train/LLaMA-Factory/output_models/**/*config*
 #for these folders, they exist and are modified on the HPC, I dont want to transfer them
 bitsandbytes/
 train/LLaMA-Factory/xformers/

@@ -68,8 +68,8 @@ num_train_epochs: 1.0
 lr_scheduler_type: cosine
 warmup_ratio: 0.1
 bf16: true
-#if youre quantizing model; probably not a good idea to run this
-pure_bf16: true
+# #if youre quantizing model; probably not a good idea to run this
+# pure_bf16: true
 fp16: false
 ddp_timeout: 180000000
 flash_attn: fa2
