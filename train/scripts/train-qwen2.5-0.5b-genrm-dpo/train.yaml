@@ -7,13 +7,14 @@ trust_remote_code: true
 
 #what kind of training
 stage: dpo
+rdpo: false
 #true for training, false for eval
 do_train: true
 do_eval: false
 #Fine-tuning method. Optional: freeze, lora, full
 finetuning_type: full
 
-deepspeed: examples/deepspeed/ds_z2_config.json # choices: [ds_z0_config.json, ds_z2_config.json, ds_z3_config.json]
+deepspeed: examples/deepspeed/ds_z3_config.json # choices: [ds_z0_config.json, ds_z2_config.json, ds_z3_config.json]
 pref_beta: 0.1
 pref_loss: sigmoid # choices: [sigmoid (dpo), orpo, simpo]
 
@@ -24,7 +25,7 @@ dataset: genrm_dpo
 #Dataset template, please ensure that the dataset template corresponds to the model.
 template: qwen
 #this can significantly affect cuda memory use
-cutoff_len: 2048
+cutoff_len: 1792
 
 #subset of entire training set, for experimentation
 # only use positive numbers here
@@ -37,7 +38,7 @@ preprocessing_num_workers: 16
 ### output
 output_dir: output_models/train-qwen2.5-0.5b-genrm-dpo
 logging_steps: 1
-save_steps: 100
+save_steps: 200
 plot_loss: true
 overwrite_output_dir: true
 save_only_model: true
