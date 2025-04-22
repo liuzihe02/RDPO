@@ -55,6 +55,7 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         r"""
         Computes the sum log probabilities of the labels under given logits if loss_type is not IPO, ORPO or SimPO.
 
+        THIS PROCESSES ALL CHOSEN REJECTED REASONING ALL AT ONCE; CAUSES ALOT OF OUT-OF-MEMORY ERRORS
 
         this splits up a batch tensor into the relevant stuff
 
@@ -90,6 +91,7 @@ class CustomRDPOTrainer(CustomDPOTrainer):
         # this all logits_is of shape (3 * batch_size, seq_len, d_vocab)
 
         # keep the data format as is
+        # THIS IS THE MAIN MEMORY BOTTLENECK
         all_logits = model(**batch, return_dict=True, use_cache=False).logits
 
         self.profile_memory("After loading logits")
@@ -120,10 +122,10 @@ class CustomRDPOTrainer(CustomDPOTrainer):
 
         self.profile_memory("After getting logps")
 
-        del all_logits
+        del all_logits, batch
         torch.cuda.empty_cache()
 
-        self.profile_memory("After deleting logits")
+        self.profile_memory("After deleting logits and batch")
 
         # these are of shape (3*batch_size)
         # logger.info_rank0(f"zihe debug shape of all_logps is {all_logps.shape}")
@@ -172,6 +174,80 @@ class CustomRDPOTrainer(CustomDPOTrainer):
                 rejected_logps / rejected_length,
                 reasoning_logps / reasoning_length,
             )
+
+    # @override
+    # def concatenated_forward(
+    #     self, model: "PreTrainedModel", batch: Dict[str, "torch.Tensor"]
+    # ) -> Tuple[
+    #     "torch.Tensor",
+    #     "torch.Tensor",
+    #     "torch.Tensor",
+    #     "torch.Tensor",
+    #     "torch.Tensor",
+    #     "torch.Tensor",
+    # ]:
+    #     """
+    #     Computes log probabilities by processing chosen, rejected, and reasoning in separate passes
+    #     to reduce peak memory usage while maintaining PyTorch vectorization.
+    #     """
+    #     if self.finetuning_args.use_ref_model:
+    #         batch = nested_detach(batch, clone=True)  # avoid error
+
+    #     # reset peak memory stats
+    #     torch.cuda.reset_peak_memory_stats()
+    #     self.profile_memory("Initial")
+
+    #     # Calculate batch size for each component
+    #     batch_size = batch["input_ids"].size(0) // 3
+
+    #     # Create batches for each component
+    #     chosen_batch = {k: v[:batch_size] for k, v in batch.items()}
+    #     rejected_batch = {k: v[batch_size : 2 * batch_size] for k, v in batch.items()}
+    #     reasoning_batch = {k: v[2 * batch_size :] for k, v in batch.items()}
+
+    #     # Process chosen responses
+    #     chosen_logits = model(**chosen_batch, return_dict=True, use_cache=False).logits
+    #     chosen_logps, chosen_length = get_batch_logps(logits=chosen_logits, labels=chosen_batch["labels"])
+    #     del chosen_logits, chosen_batch
+    #     torch.cuda.empty_cache()
+
+    #     self.profile_memory("After processing chosen")
+
+    #     # Process rejected responses
+    #     rejected_logits = model(**rejected_batch, return_dict=True, use_cache=False).logits
+    #     rejected_logps, rejected_length = get_batch_logps(logits=rejected_logits, labels=rejected_batch["labels"])
+    #     del rejected_logits, rejected_batch
+    #     torch.cuda.empty_cache()
+
+    #     self.profile_memory("After processing rejected")
+
+    #     # Process reasoning responses
+    #     reasoning_logits = model(**reasoning_batch, return_dict=True, use_cache=False).logits
+    #     reasoning_logps, reasoning_length = get_batch_logps(logits=reasoning_logits, labels=reasoning_batch["labels"])
+    #     del reasoning_logits, reasoning_batch
+    #     torch.cuda.empty_cache()
+
+    #     self.profile_memory("After processing reasoning")
+
+    #     # Return appropriate values based on loss type
+    #     if self.loss_type in ["ipo", "orpo", "simpo"]:
+    #         return (
+    #             chosen_logps,
+    #             rejected_logps,
+    #             reasoning_logps,
+    #             chosen_logps,
+    #             rejected_logps,
+    #             reasoning_logps,
+    #         )
+    #     else:
+    #         return (
+    #             chosen_logps,
+    #             rejected_logps,
+    #             reasoning_logps,
+    #             chosen_logps / chosen_length,
+    #             rejected_logps / rejected_length,
+    #             reasoning_logps / reasoning_length,
+    #         )
 
     # the compute reference log probs can remain the same
     @override
