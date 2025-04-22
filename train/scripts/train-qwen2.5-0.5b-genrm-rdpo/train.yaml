@@ -18,9 +18,9 @@ rdpo: true
 do_train: true
 do_eval: false
 #Fine-tuning method. Optional: freeze, lora, full
-finetuning_type: lora
-lora_rank: 8
-lora_target: all
+finetuning_type: full
+# lora_rank: 8
+# lora_target: all
 deepspeed: examples/deepspeed/ds_z3_config.json # choices: [ds_z0_config.json, ds_z2_config.json, ds_z3_config.json]
 pref_beta: 0.1
 pref_loss: sigmoid # choices: [sigmoid (dpo), orpo, simpo]
