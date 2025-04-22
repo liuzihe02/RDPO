@@ -3,10 +3,10 @@ set -e
 
 #this file does validation on the math500 dataset
 
-export CUDA_VISIBLE_DEVICES=3
+export CUDA_VISIBLE_DEVICES=0
 
 #this directory contains many subdirectories. Each subdirectory is a checkpoint directory
-model_dir="../../train/LLaMA-Factory/output_models/train-qwen2.5-0.5b-genrm-rdpo"
+model_dir="../../train/LLaMA-Factory/output_models/train-qwen2.5-0.5b-genrm-sft"
 
 #we will create a results directory in the results folder
 output_dir="../evaluate-results"
@@ -29,12 +29,12 @@ num_samples=500
 # cd ../../evaluate_mmlu-pro
 # bash mmlu-pro-eval.sh ${model_path} ${output_dir} ${summary_path} 0
 
-#get the model name
-model_name=$(basename "$model_dir")
+#get the model name - like train-qwen2.5-0.5b-genrm-rdpo
+run=$(basename "$model_dir")
 
 # create the results folder in the output_dir
 # we temporarily create the name first
-results_dir="${output_dir}/${model_name}-eval-${data}"
+results_dir="${output_dir}/${run}-eval-${data}"
 
 # Check if the results_dir already exists
 if [ -d "$results_dir" ]; then
@@ -57,6 +57,9 @@ for checkpoint_dir in ${model_dir}/checkpoint-*; do
         
         echo "Processing checkpoint-${checkpoint_num}"
         # EVALUATION SETTINGS
+
+        #merge lora adapters with base model - so vllm interprets them as one whole model
+        python3 merge_adapters.py -c "$checkpoint_dir"
         
         bash validate_single.sh "$checkpoint_dir" "$checkpoint_output" "$summary_path" "$data" "$num_samples"
     fi

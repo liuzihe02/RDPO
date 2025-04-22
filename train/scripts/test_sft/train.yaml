@@ -11,7 +11,7 @@ trust_remote_code: true
 
 #what kind of training
 # still provide dpo here even if you use rdpo
-stage: dpo
+stage: sft
 #IMPORTANT if you use dpo, need to specify if RDPO or not! If dont specify, just normal DPO
 rdpo: true
 #true for training, false for eval
@@ -22,20 +22,11 @@ finetuning_type: lora
 lora_rank: 1
 lora_target: all
 deepspeed: examples/deepspeed/ds_z2_config.json # choices: [ds_z0_config.json, ds_z2_config.json, ds_z3_config.json]
-pref_beta: 0.1
-pref_loss: sigmoid # choices: [sigmoid (dpo), orpo, simpo]
-
-#the hyperparam for our RDPO loss
-# may need some investigation here to see the tuning for this
-reasoning_weight: 0.5
-#whether to normalize the reasoning logps or not
-norm_reasoning: true
-
 ### dataset
 
 #must exist locally, in the LlamaFactory dataset folder
 #remember to use the RDPO dataset format
-dataset: genrm_rdpo
+dataset: genrm_sft_no_veri
 #Dataset template, please ensure that the dataset template corresponds to the model.
 # though i think this is just to format the dataset questions?
 template: qwen
@@ -50,7 +41,7 @@ overwrite_cache: true
 preprocessing_num_workers: 16
 
 ### output
-output_dir: output_models/train-qwen2.5-0.5b-genrm-rdpo
+output_dir: output_models/train-qwen2.5-0.5b-genrm-sft-no_veri
 logging_steps: 1
 save_steps: 20
 plot_loss: true

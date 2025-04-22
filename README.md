@@ -371,7 +371,7 @@ Make sure all the scripts have the right settiings; we manually customize this f
 
 TODO: you probably need to double check all the tokens; what goes in and out of the LLM, before you finally confirm the results
 
-```bash
+```yaml
 ### model
 model_name_or_path: Qwen/Qwen2.5-0.5B-Instruct
 
@@ -386,6 +386,9 @@ trust_remote_code: true
 
 #what kind of training, we usually use dpo or sft. the data format layout changes accordingly
 stage: dpo
+#IMPORTANT if you use dpo, need to specify if RDPO or not! If dont specify, just normal DPO
+# this argument only works with dpo
+rdpo: true
 #true for training, false for eval
 do_train: true
 do_eval: false
@@ -398,6 +401,12 @@ finetuning_type: full
 deepspeed: examples/deepspeed/ds_z2_offload_config.json # choices: [ds_z0_config.json, ds_z2_config.json, ds_z3_config.json]
 pref_beta: 0.1
 pref_loss: sigmoid # choices: [sigmoid (dpo), orpo, simpo]
+
+#the hyperparam for our RDPO loss
+# may need some investigation here to see the tuning for this
+reasoning_weight: 0.5
+#whether to normalize the reasoning logps or not
+norm_reasoning: true
 
 ### dataset
 
@@ -457,6 +466,10 @@ ddp_timeout: 180000000
 ```
 
 Note that the hyperparameters here are defined in **both** `src/llamafactory/hparams` and the transformers package `.venv/lib64/python3.10/site-packages/transformers/training_args.py`
+
+### Saving Models
+
+Note that because `llamafactory` with LoRA doesn't work well with VLLM inference (llamafactory only saves the adapter weights but we want BOTH the model and LoRA adapter weights to do eval), we do some post processing to merge the weights in `merge_adapters.py`
 
 ## Validation Scripts
 
