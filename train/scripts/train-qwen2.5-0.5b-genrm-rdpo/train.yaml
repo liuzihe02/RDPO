@@ -41,7 +41,7 @@ dataset: genrm_rdpo
 template: qwen
 #this can significantly affect cuda memory use; reduce this if memory problems too much
 # for rdpo, text is doubled so memory issues more prevalent
-cutoff_len: 1792
+cutoff_len: 1664
 #subset of entire training set, for experimentation
 # only use positive numbers here
 # set it to the size of the dataset
@@ -63,7 +63,7 @@ per_device_train_batch_size: 6 #may need to reduce batch size since reasoning ad
 #best to keep the same or increase
 gradient_checkpointing: true
 gradient_accumulation_steps: 1
-learning_rate: 1.0e-6
+learning_rate: 5.0e-4
 num_train_epochs: 1.0
 lr_scheduler_type: cosine
 warmup_ratio: 0.1

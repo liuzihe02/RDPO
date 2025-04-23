@@ -26,7 +26,7 @@ dataset: genrm_dpo
 #Dataset template, please ensure that the dataset template corresponds to the model.
 template: qwen
 #this can significantly affect cuda memory use
-cutoff_len: 1792
+cutoff_len: 1664
 
 #subset of entire training set, for experimentation
 # only use positive numbers here
@@ -47,7 +47,7 @@ save_only_model: true
 ### train
 per_device_train_batch_size: 6
 gradient_accumulation_steps: 1
-learning_rate: 1.0e-6
+learning_rate: 5.0e-4
 num_train_epochs: 1.0
 lr_scheduler_type: cosine
 warmup_ratio: 0.1

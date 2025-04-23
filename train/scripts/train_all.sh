@@ -3,9 +3,10 @@ set -e
 
 # List of directories that contain their own train.sh
 train_dirs=(
-    "test_dpo"
-    "test_rdpo"
-    "test_sft"
+    "train-qwen2.5-0.5b-genrm-sft-no_veri"
+    "train-qwen2.5-0.5b-genrm-sft-veri"
+    "train-qwen2.5-0.5b-genrm-dpo"
+    "train-qwen2.5-0.5b-genrm-rdpo"
 )
 
 # Save the original working directory
