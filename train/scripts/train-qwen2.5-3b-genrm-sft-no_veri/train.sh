@@ -4,7 +4,7 @@
 cd ../../LLaMA-Factory
 PROJECT_NAME="RDPO"
 #make all gpus avaiable for training
-export CUDA_VISIBLE_DEVICES=1,2,3,4,5,6,7
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 
 #if youre using scratch space, you will need to redirect where cache is stored to speed up communications and save space
 #if not specified, all these stuff will be saved in the ~ home directory as .cache/ and .triton/
