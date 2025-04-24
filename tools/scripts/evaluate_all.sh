@@ -7,8 +7,7 @@ export CUDA_VISIBLE_DEVICES=0
 #each directory here contains many subdirectories. Each subdirectory is a checkpoint directory
 # we evaluate ALL THESE runs all at one go
 model_dirs=(
-    "../../train/LLaMA-Factory/output_models/train-qwen2.5-0.5b-genrm-dpo"
-    "../../train/LLaMA-Factory/output_models/train-qwen2.5-0.5b-genrm-rdpo"
+    "../../train/LLaMA-Factory/output_models/train-qwen2.5-0.5b-genrm-sft-veri"
     "../../train/LLaMA-Factory/output_models/train-qwen2.5-0.5b-genrm-sft-no_veri"
 )
 
@@ -17,7 +16,7 @@ model_dirs=(
 data="gsm8k,math-500"
 #number of samples to use for validation
 #if multiple datasets are provided, then we take num_samples from EACH dataset
-num_samples=5
+num_samples=500
 
 for model_dir in "${model_dirs[@]}"; do
     echo "=============== RUNNING VALIDATION FOR : $model_dir ==================="
