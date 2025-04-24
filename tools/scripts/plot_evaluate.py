@@ -5,6 +5,13 @@ import re
 import matplotlib.pyplot as plt
 from datetime import datetime
 
+MODEL_RUNS = [
+    "train-qwen2.5-0.5b-genrm-dpo-eval-gsm8k,math-500",
+    "train-qwen2.5-0.5b-genrm-rdpo-eval-gsm8k,math-500",
+    "train-qwen2.5-0.5b-genrm-sft-veri-eval-gsm8k,math-500",
+    "train-qwen2.5-0.5b-genrm-sft-no_veri-eval-gsm8k,math-500",
+]
+
 
 def plot_evaluate_results(validation_dir):
     # Dictionary to store results for each model and dataset
@@ -15,7 +22,7 @@ def plot_evaluate_results(validation_dir):
     # for each dataset, we search for it
     for dataset_name in dataset_results.keys():
         # Iterate through model folders in the validation directory
-        for model_folder in os.listdir(validation_dir):
+        for model_folder in MODEL_RUNS:
             model_path = os.path.join(validation_dir, model_folder)
 
             print(f"modelpath is {model_path}")

@@ -1,2 +1,0 @@
-/scratch0/zachliu/RDPO/tools/scripts/../evaluate-results/train-qwen2.5-3b-genrm-sft-veri-eval-gsm8k,math-500/checkpoint-0/gsm8k 2025-04-23 07:27:12 Final Accuracy: 87.8
-/scratch0/zachliu/RDPO/tools/scripts/../evaluate-results/train-qwen2.5-3b-genrm-sft-veri-eval-gsm8k,math-500/checkpoint-0/math-500 2025-04-23 07:27:54 Final Accuracy: 64.6
