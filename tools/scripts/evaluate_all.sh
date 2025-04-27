@@ -7,8 +7,7 @@ export CUDA_VISIBLE_DEVICES=0
 #each directory here contains many subdirectories. Each subdirectory is a checkpoint directory
 # we evaluate ALL THESE runs all at one go
 model_dirs=(
-    "../../train/LLaMA-Factory/output_models/train-qwen2.5-0.5b-genrm-sft-veri"
-    "../../train/LLaMA-Factory/output_models/train-qwen2.5-0.5b-genrm-sft-no_veri"
+    "../../train/LLaMA-Factory/output_models/train-qwen2.5-3b-genrm-sft-no_veri"
 )
 
 #what data to evaluate on; these are available

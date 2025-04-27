@@ -11,18 +11,22 @@ import json
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
 import os
+import re
 
 # Files to keep after merging
+# regex patterns
+# ^ matches the start of string, \. means a literal dot, and $ means end of string
 KEEP_PATTERNS = [
-    "added_tokens.json",
-    "config.json",  # model config
-    "generation_config.json",
-    "merges.txt",
-    "model.safetensors",  # model weights
-    "special_tokens_map.json",
-    "tokenizer_config.json",
-    "tokenizer.json",  # tokenizer files
-    "vocab.json",
+    r"^added_tokens\.json$",
+    r"^config\.json$",  # model config
+    r"^generation_config\.json$",
+    r"^merges\.txt$",
+    r"^model.*\.safetensors$",  # model weights with any characters between
+    r"^model\.safetensors\.index\.json$",  # model index files
+    r"^special_tokens_map\.json$",
+    r"^tokenizer_config\.json$",
+    r"^tokenizer\.json$",  # tokenizer files
+    r"^vocab\.json$",
 ]
 
 
@@ -61,9 +65,9 @@ def merge_adapters(checkpoint_dir):
         # THIS IS BECAUSE THIS RUNS INTO ERRORS FOR VLLM; WE ONLY KEEP THE ESSENTIAL STUFF
         for fname in os.listdir(checkpoint_dir):
             fpath = os.path.join(checkpoint_dir, fname)
-            # MUST KEEP EXACTLY THESE FILES
-            # this means we also DELETE THE ORIGINAL ADAPTER WEIGHTS
-            keep = any(fname == pat for pat in KEEP_PATTERNS)
+            # Check if file matches any regex pattern
+            # this means we delete the original adapter weights, as keeping this causes problems
+            keep = any(re.match(pat, fname) for pat in KEEP_PATTERNS)
             if not keep:
                 # remove this extra file
                 os.remove(fpath)
@@ -72,6 +76,8 @@ def merge_adapters(checkpoint_dir):
             f"Pruned directory, kept only merged model and tokenizer: {checkpoint_dir}"
         )
 
+    # this is likely the initial checkpoint
+    # no need to merge adapters, it is already in the right safetensors
     else:
         print("=" * 50)
         print(f"skipping merge_adapters for checkpoint: {checkpoint_dir}")
