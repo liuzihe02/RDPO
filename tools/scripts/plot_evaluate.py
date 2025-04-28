@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 
 MODEL_RUNS = [
-    "train-qwen2.5-0.5b-genrm-dpo-eval-gsm8k,math-500",
-    "train-qwen2.5-0.5b-genrm-rdpo-eval-gsm8k,math-500",
+    # "train-qwen2.5-0.5b-genrm-dpo-eval-gsm8k,math-500",
+    # "train-qwen2.5-0.5b-genrm-rdpo-eval-gsm8k,math-500",
     "train-qwen2.5-0.5b-genrm-sft-veri-eval-gsm8k,math-500",
     "train-qwen2.5-0.5b-genrm-sft-no_veri-eval-gsm8k,math-500",
 ]

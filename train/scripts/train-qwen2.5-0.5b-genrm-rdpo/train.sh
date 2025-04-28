@@ -6,22 +6,6 @@ PROJECT_NAME="RDPO"
 #make all gpus avaiable for training
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 
-#if youre using scratch space, you will need to redirect where cache is stored to speed up communications and save space
-#if not specified, all these stuff will be saved in the ~ home directory as .cache/ and .triton/
-# pick your scratch path; adjust to whatever’s available on your cluster
-export SCRATCH=/scratch0/$USER
-export RDPO_CACHE="$SCRATCH/rdpo_cache"
-
-# bootstrap the cache directories
-mkdir -p "$RDPO_CACHE"/{triton,hf/datasets,hf/metrics}
-
-export TRITON_CACHE_DIR="$RDPO_CACHE/triton"
-# for model/tokenizer weights & configs
-export HF_HOME="$RDPO_CACHE/hf"
-# for datasets (JSON, Arrow shards, etc)
-export HF_DATASETS_CACHE="$RDPO_CACHE/hf/datasets"
-export HF_METRICS_CACHE="$RDPO_CACHE/hf/metrics"
-
 
 export WANDB_API_KEY=f318ffd0dcf5d31701fd33aee12e57e9cf15444f
 export WANDB_PROJECT=$PROJECT_NAME
