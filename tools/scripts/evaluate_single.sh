@@ -34,11 +34,12 @@ results_dir="${output_dir}/${run}-eval-${data}"
 
 # Check if the results_dir already exists
 if [ -d "$results_dir" ]; then
-    echo "Error: Results directory '$results_dir' already exists. Aborting to prevent overwrite."
-    exit 1
+    echo "WARNING: Results directory '$results_dir' already exists. Overwriting..."
+    rm -rf "$results_dir"  # Remove the existing directory
+    mkdir -p "$results_dir"  # Create a fresh directory
 else
-    #can continue making the results directory
-    echo "Results directory '$results_dir' does not exist. Safe to proceed."
+    # Create the results directory if it doesn't exist
+    echo "Results directory '$results_dir' does not exist. Creating it now."
     mkdir -p "$results_dir"
 fi
 
