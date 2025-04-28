@@ -28,12 +28,12 @@
 set -e
 
 # List all 8 H100 GPUs
-cuda_devices=(0 1 2)
+cuda_devices=(0 1)
 
 # Each directory here contains many subdirectories with checkpoints
 model_dirs=(
-    "../../train/LLaMA-Factory/output_models/train-qwen2.5-3b-genrm-sft-no_veri"
-    # Add more model directories if needed
+"../../train/LLaMA-Factory/output_models/train-qwen2.5-0.5b-genrm-sft-no_veri"    
+"../../train/LLaMA-Factory/output_models/train-qwen2.5-0.5b-genrm-sft-veri"
 )
 
 # Evaluation datasets
