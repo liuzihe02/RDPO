@@ -28,10 +28,12 @@ MODEL_NAME_OR_PATH=$(grep -m1 "^model_name_or_path:" "$CONFIG_FILE" | cut -d':' 
 
 # Check if output directory exists
 if [ -d "$OUTPUT_DIR" ]; then
-    echo "Error: Output directory '$OUTPUT_DIR' already exists. Aborting to prevent overwrite."
-    exit 1
+    echo "WARNING: Output directory '$OUTPUT_DIR' already exists. Overwriting..."
+    rm -rf "$OUTPUT_DIR"  # Remove the existing directory
+    mkdir -p "$OUTPUT_DIR"  # Create a fresh directory
 else
-    echo "Output directory '$OUTPUT_DIR' does not exist. Safe to proceed."
+    echo "Output directory '$OUTPUT_DIR' does not exist. Creating new directory."
+    mkdir -p "$OUTPUT_DIR"  # Create a fresh directory
 fi
 
 #save the first checkpoint of the model because the training script doesnt do this for us

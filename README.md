@@ -457,6 +457,7 @@ per_device_train_batch_size: 16
 gradient_accumulation_steps: 1
 learning_rate: 5.0e-6
 num_train_epochs: 2.0
+#this is a transformers Trainer argument, which accepts stuff like cosine, linear, constant etc
 lr_scheduler_type: cosine
 warmup_ratio: 0.1
 #please keep this settings! when we dequantize; we hardcode to bf16 in RDPO
