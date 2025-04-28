@@ -1,34 +1,34 @@
-#!/bin/bash
+# #!/bin/bash
 
-# Request resources
-#$ -S /bin/bash
-#$ -l tmem=100G
-#$ -l gpu=true
-#$ -l h_rt=24:00:00
-#$ -l gpu_type=h100
-#$ -pe gpu 8
-#$ -P aihub_ucl
-#$ -N train-rdpo-all
-#$ -j y
+# # Request resources
+# #$ -S /bin/bash
+# #$ -l tmem=100G
+# #$ -l gpu=true
+# #$ -l h_rt=24:00:00
+# #$ -l gpu_type=h100
+# #$ -pe gpu 8
+# #$ -P aihub_ucl
+# #$ -N train-rdpo-all
+# #$ -j y
 
-# Print some information about the job
-echo "Running on host: $(hostname)"
-echo "Current working directory: $(pwd)"
-echo "Starting on: $(date)"
-echo "Using GPU devices: $CUDA_VISIBLE_DEVICES"
+# # Print some information about the job
+# echo "Running on host: $(hostname)"
+# echo "Current working directory: $(pwd)"
+# echo "Starting on: $(date)"
+# echo "Using GPU devices: $CUDA_VISIBLE_DEVICES"
 
-# Load environment setup
-# Source the bashrc to get all the environment variables
-# also includes CUDA stuff
-source $HOME/.bashrc
+# # Load environment setup
+# # Source the bashrc to get all the environment variables
+# # also includes CUDA stuff
+# source $HOME/.bashrc
 
-# Activate virtual environment
-source $HOME/RDPO/venv4/bin/activate
+# # Activate virtual environment
+# source $HOME/RDPO/venv4/bin/activate
 
-# FROM HERE ON OUT USE THE SCRATCH SPACE
-# the scratch env variable should already be defined in the bashrc file
-# Navigate to scripts directory
-cd $SCRATCH/RDPO/train/scripts
+# # FROM HERE ON OUT USE THE SCRATCH SPACE
+# # the scratch env variable should already be defined in the bashrc file
+# # Navigate to scripts directory
+# cd $SCRATCH/RDPO/train/scripts
 
 # List of directories that contain their own train.sh
 train_dirs=(
