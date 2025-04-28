@@ -6,9 +6,9 @@
 #$ -l gpu=true
 #$ -l h_rt=24:00:00
 #$ -l gpu_type=h100
-#$ -pe gpu 8
+#$ -pe gpu 2
 #$ -P aihub_ucl
-#$ -N train-rdpo-all
+#$ -N train-rdpo
 #$ -j y
 
 # Print some information about the job
