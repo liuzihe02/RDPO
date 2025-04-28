@@ -50,7 +50,7 @@ overwrite_cache: true
 preprocessing_num_workers: 16
 
 ### output
-output_dir: output_models/train-qwen2.5-0.5b-genrm-rdpo
+output_dir: ${SCRATCH}/output_models/train-qwen2.5-0.5b-genrm-rdpo
 logging_steps: 1
 save_steps: 0.1
 plot_loss: true

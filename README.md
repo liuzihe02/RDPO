@@ -426,6 +426,10 @@ overwrite_cache: true
 preprocessing_num_workers: 16
 
 ### output
+
+# ${SCRATCH}/output_models/train-qwen2.5-0.5b-genrm-rdpo
+# sometimes i store this stuff in the scratch space
+# i use the environment variable here which is set in bashrc
 output_dir: output_models/train-qwen2.5-0.5b-genrm-dpo
 logging_steps: 1
 save_steps: 10
