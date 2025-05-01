@@ -10,6 +10,7 @@
 #$ -P aihub_ucl
 #$ -N train-rdpo
 #$ -j y
+#$ -cwd
 
 # Print some information about the job
 echo "Running on host: $(hostname)"
@@ -30,6 +31,7 @@ source $HOME/RDPO/venv4/bin/activate
 cd $HOME/RDPO/train/scripts
 
 # List of directories that contain their own train.sh
+# this is just the folder name itself without any path prefixes
 train_dirs=(
     "train-qwen2.5-3b-genrm-sft-veri"
 )
