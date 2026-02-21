@@ -1,0 +1,864 @@
+% ============================================================
+% LITERATURE REVIEW UPDATE — Critique DPO
+% New papers (2024–2026) to incorporate into Section 3
+% ============================================================
+% This file can be \input{} into main.tex, or merged manually.
+% New \addbibresource entries are collected at the end of this file.
+% ============================================================
+
+\section*{Literature Review Update (2024--2026)}
+\addcontentsline{toc}{section}{Literature Review Update}
+
+The literature on critique-augmented preference optimisation and
+generative verifiers has grown rapidly since this document was first
+drafted.  The additions below are organised into five new clusters
+that extend the existing review in Section~\ref{sec:lit}.
+
+% ============================================================
+\subsection{Step-Level Preference Optimisation}
+\label{sec:step-dpo}
+% ============================================================
+
+Standard DPO assigns a single preference signal to a complete
+response.  A growing line of work argues that CoT reasoning requires
+\emph{per-step} supervision because errors early in a chain
+propagate forward and cannot be corrected by an outcome-level signal.
+
+% \subsubsection{From r to Q*: DPO as Token-Level Q-Learning}
+
+% \autocite{rafailov2024rqlanguagemodel} prove that the DPO optimum
+% satisfies the Bellman equation at the \emph{token} level, so a
+% DPO-trained policy is implicitly a Q-function over the token-level
+% MDP.  The key identity is
+% \begin{equation}
+%   \pi^*(y_t \mid x, y_{<t})
+%   \;\propto\;
+%   \pi_{\mathrm{ref}}(y_t \mid x, y_{<t})
+%   \exp\!\bigl(\beta^{-1} A^*(s_t, a_t)\bigr),
+% \end{equation}
+% where $A^*$ is the optimal advantage function.  This result provides
+% the theoretical foundation for step-level DPO variants: because the
+% DPO loss already assigns implicit step rewards, supervising
+% \emph{intermediate} steps directly (rather than whole responses)
+% should improve credit assignment.
+
+% \subsubsection{Chain of Preference Optimisation (CPO)}
+
+% \autocite{zhang2024chainpreferenceoptimization} observe that
+% Tree-of-Thought (ToT) search trees naturally expose step-level
+% preference pairs: at each branching node one sub-tree eventually
+% reaches a correct answer while others do not.  CPO extracts these
+% pairs and applies DPO \emph{step by step}, enabling an LLM to
+% reproduce ToT quality at inference without search.  Experiments on
+% question answering, fact verification, and arithmetic yield up to a
+% 4.3\% average improvement over the SFT baseline.
+
+\subsubsection{Step-DPO}
+
+\autocite{lai2024stepdpostepwisepreferenceoptimization}
+construct 10K step-wise preference pairs using self-generated data
+and apply DPO at the step level, arguing that whole-response
+comparison provides insufficient localisation of errors in
+long-chain mathematical reasoning.  Applied to Qwen2-72B-Instruct,
+Step-DPO achieves 70.8\% on MATH, surpassing GPT-4 at the time of
+publication.
+
+% \subsubsection{Step-Controlled DPO (SCDPO)}
+
+% \autocite{lu2024stepcontrolleddpoleveragingstepwise} create negative
+% samples for DPO by generating reasoning traces that begin making
+% errors at a specified step, explicitly teaching the model to identify
+% and avoid reasoning errors at known positions.  Applied to
+% InternLM2-20B, SCDPO achieves 88.5\% on GSM8K and 58.1\% on MATH.
+
+% \subsubsection{Self-Explore}
+
+% \autocite{hwang2024selfexporeenhancingmathematical} train LLMs to
+% identify the \emph{first pit} (first erroneous step) in their own
+% reasoning traces and then apply DPO on step-level preference pairs
+% derived from this analysis.  The first-pit identification acts as a
+% form of automated self-critique, improving GSM8K and MATH performance
+% by 11.6\% and 2.9\% respectively across three base models.  This is
+% among the closest existing approaches to the Critique DPO idea: the
+% model generates a localised critique before constructing preference
+% data.
+
+\subsubsection{Thinking Preference Optimisation (ThinkPO)}
+
+\autocite{yang2025thinkingpreferenceoptimization} apply DPO to
+reasoning depth itself, using short CoT responses as rejected
+completions and long CoT responses as chosen completions.  Without
+any new training data, ThinkPO improves DeepSeek-R1-Distill-Qwen-7B
+from 87.4\% to 91.2\% on MATH500 and increases average output length
+by 25.9\%.
+
+\subsubsection{Uncovering the Role of CoT in DPO}
+
+\autocite{gao2025uncoveringimpactchainofthought} provide empirical
+evidence that DPO's success on reasoning tasks is largely
+\emph{attributable} to the presence of CoT data.  Across ten LLMs
+and the text-to-SQL domain (which lacks CoT), DPO degrades
+performance in six cases.  The analysis shows that CoT in DPO
+training mitigates reward hacking and improves discriminative
+calibration—directly motivating the Critique DPO approach of
+incorporating verifier CoT explicitly into the loss.
+
+% \subsubsection{Advancing LLM Reasoning with Preference Trees (UltraInteract)}
+
+% \autocite{yuan2024eurus} introduce UltraInteract, a large-scale
+% dataset structured as preference trees where each instruction has
+% multiple correct and incorrect reasoning paths with per-step
+% comparison data.  A notable finding is that standard DPO
+% \emph{hurts} performance on reasoning tasks, while KTO and NCA
+% improve it—further motivating principled modifications to the DPO
+% objective such as Critique DPO.
+
+% ============================================================
+\subsection{Process Reward Models: From Scalar to Generative}
+\label{sec:prm}
+% ============================================================
+
+Process Reward Models (PRMs) assign a reward to \emph{each} step of
+a reasoning chain rather than to the final answer alone.  The field
+has evolved rapidly from human-annotated scalar PRMs toward automated
+and generative variants.
+
+\subsubsection{Let's Verify Step by Step (PRM800K)}
+
+\autocite{lightman2023letsverifystepstep} demonstrate that
+process supervision substantially outperforms outcome supervision on
+MATH, achieving 78\% accuracy with a process-supervised reward model
+compared to 72.4\% for outcome supervision.  The paper releases
+PRM800K, a dataset of 800K step-level human annotations, and remains
+the canonical reference for step-level feedback in reasoning.
+
+% \subsubsection{Automated PRMs: Math-Shepherd and OmegaPRM}
+
+% \autocite{wang2024mathshepherd} introduce an automated process for
+% assigning step-level reward labels using Monte-Carlo completion
+% estimates, eliminating human annotation.  The step-level PRM is then
+% used for both best-of-$n$ reranking and PPO training.
+
+% \autocite{luo2024improvemathematicalreasoninglanguage} (OmegaPRM)
+% refine this with a divide-and-conquer MCTS strategy that locates the
+% first error in a CoT via binary search, collecting over 1.5M process
+% annotations at significantly lower compute cost.  The Google DeepMind
+% model improves from 51\% to 69.4\% on MATH500.
+
+% \subsubsection{Process Advantage Verifiers (PAVs)}
+
+% \autocite{setlur2024rewardingprogressscalingautomated} introduce
+% Process Advantage Verifiers that measure the \emph{progress} made by
+% a step as the change in expected outcome reward before and after the
+% step.  PAVs outperform ORMs by over 8\% during test-time search and
+% enable 5--6$\times$ sample efficiency gains in online RL, providing a
+% principled notion of step value directly relevant to Critique DPO's
+% step-level credit assignment.
+
+% \subsubsection{Free Process Rewards and PRIME}
+
+% \autocite{yuan2024freeprocessrewardsprocess} show that implicit PRMs
+% can be derived from outcome reward models \emph{for free}, using
+% log-likelihood ratios without any step-level labels, outperforming
+% Math-Shepherd while using $<$1/38 of its training data.
+
+% \autocite{cui2025primereinforcementprocessimplicit} (PRIME) apply
+% these implicit process rewards in online RL (GRPO, PPO, RLOO),
+% achieving a 15.1\% average improvement starting from Qwen2.5-Math-7B
+% using only 10\% of the data needed by supervised approaches.
+
+\subsubsection{ThinkPRM: Process Reward Models That Think}
+
+\autocite{khalifa2025thinkprmprocessrewardmodels} is perhaps the
+closest existing work to the Critique DPO generative-verifier idea at
+the process level.  ThinkPRM generates a verification
+chain-of-thought \emph{before} scoring each reasoning step rather
+than predicting a scalar.  Using only 1\% of the PRM800K labels,
+ThinkPRM surpasses discriminative PRMs trained on the full dataset by
+8\% on GPQA-Diamond, demonstrating that generative CoT verifiers are
+substantially more data-efficient than scalar counterparts.
+
+\subsubsection{GenPRM}
+
+\autocite{zhao2025genprm} extend the generative PRM idea by combining
+natural-language reasoning with executable code verification before
+assigning a step score.  A 7B GenPRM exceeds Qwen2.5-Math-PRM-72B
+using only 23K training examples, further establishing that
+generative verifier reasoning provides a strong inductive bias for
+process supervision.
+
+\subsubsection{Lessons in Developing PRMs}
+
+\autocite{zhang2025lessonsdevelopingprocessreward} provide an
+important empirical caveat: Monte-Carlo estimation methods (e.g.\
+Math-Shepherd) yield inferior PRMs compared to LLM-as-judge and
+human annotation.  PRMs trained with MC estimation tend to focus
+assessment on final-answer steps rather than intermediate steps,
+suggesting that critique-style verification (as in GenRM-CoT and
+Critique DPO) may better capture the true step-level quality signal.
+
+% \subsubsection{MCTS-Based Self-Training with Process Rewards}
+
+% \autocite{zhang2024restmcts} (ReST-MCTS$^*$) integrate process
+% reward guidance with MCTS tree search for self-training, simultaneously
+% improving policy and reward models.
+% \autocite{guan2025rstarmathsmallllms} (rStar-Math) combine MCTS with
+% a \emph{process preference model} (PPM) trained on step-level
+% comparison data, improving Qwen2.5-Math-7B from 58.8\% to 90.0\% on
+% MATH and matching o1-preview on competition benchmarks.  Both papers
+% demonstrate that the self-evolving generator--verifier loop enabled by
+% process rewards can close most of the gap with frontier closed models.
+
+% % ============================================================
+% \subsection{Reinforcement Learning with Verifiable Rewards}
+% \label{sec:grpo}
+% % ============================================================
+
+% The most dramatic practical development since the original draft of
+% this paper is the emergence of \emph{reasoning models} trained with
+% RL using rule-based verifiable rewards, which has reshaped the
+% context in which Critique DPO sits.
+
+% \subsubsection{GRPO: Group Relative Policy Optimisation}
+
+% \autocite{shao2024deepseekmath} (DeepSeekMath) introduce Group
+% Relative Policy Optimisation (GRPO), which replaces PPO's learned
+% critic with a group-score baseline, substantially reducing memory
+% overhead:
+% \begin{equation}
+%   \hat{A}_{i,t}
+%   = \frac{r_i - \mathrm{mean}(\{r_j\}_{j=1}^G)}
+%          {\mathrm{std}(\{r_j\}_{j=1}^G)},
+% \end{equation}
+% where rewards are normalised within groups of $G$ sampled responses.
+% GRPO has become the standard algorithm for reasoning model training.
+
+% \subsubsection{DeepSeek-R1}
+
+% \autocite{deepseekai2025deepseekr1} demonstrate that long-form
+% CoT reasoning, self-reflection, and verification \emph{emerge} from
+% pure RL with verifiable rewards, without any human-labelled reasoning
+% trajectories.  DeepSeek-R1's four-stage pipeline
+% (cold-start SFT~$\to$ RL~$\to$ rejection-sampling SFT~$\to$ final RL)
+% and its distilled variants have become the de-facto baseline for
+% open-source reasoning models.  The training paradigm is directly
+% relevant to Critique DPO: R1 uses binary correctness as a reward,
+% whereas Critique DPO proposes richer critique-structured rewards.
+
+% \subsubsection{Kimi k1.5}
+
+% \autocite{kimiteam2025kimik15} report that their \emph{Chain-of-Thought
+% reward model} achieves 98.5\% annotation accuracy versus 84.4\% for a
+% classical scalar reward model on a challenging preference dataset.
+% This provides direct empirical support for the premise of Critique DPO:
+% reward models that reason before judging are substantially more
+% accurate than those that predict a scalar directly.
+
+% \subsubsection{Open-Source GRPO Variants: DAPO and VAPO}
+
+% \autocite{yu2025dapo} (DAPO) achieve 50 points on AIME 2024 with
+% Qwen2.5-32B using asymmetric clipping, token-level normalisation,
+% dynamic sampling, and an entropy bonus—surpassing DeepSeek-R1-Zero
+% with 50\% fewer training steps.
+% \autocite{liu2025vapo} (VAPO) additionally address value-model bias,
+% heterogeneous sequence lengths, and reward sparsity in long-CoT RL,
+% achieving 60.4 on AIME 2024.
+
+% \subsubsection{Tulu 3 / RLVR}
+
+% \autocite{lambert2024tulu3} demonstrate that an
+% \emph{RLVR} (Reinforcement Learning with Verifiable Rewards) stage
+% added after DPO produces the best open-source post-training recipe at
+% the time of publication, providing an important practical template for
+% pipelines that could incorporate Critique DPO signals.
+
+% ============================================================
+\subsection{Training Critique and Self-Correction Models}
+\label{sec:critique-rl}
+% ============================================================
+
+A second growing cluster trains models specifically to \emph{generate}
+critiques or corrections, rather than using externally provided ones.
+
+\subsubsection{CriticGPT}
+
+\autocite{mcaleese2024llmcriticshelpllm} train an LLM critique model
+via RLHF on human-annotated errors injected into ChatGPT outputs.
+CriticGPT-trained critics are preferred over unassisted human critics
+in 63\% of cases and catch $\sim$85\% of bugs versus $\sim$25\% for
+humans alone.  The paper validates the scalable-oversight motivation
+for critique-based training and provides a practical data construction
+recipe.
+
+% \subsubsection{SCoRe: Self-Correction via RL}
+
+% \autocite{kumar2024traininglanguagemodelsselfcorrect} (SCoRe)
+% train LLMs to self-correct using a multi-turn online RL framework,
+% addressing distribution mismatch and behaviour collapse that arise
+% when supervised fine-tuning is used for self-correction.  SCoRe
+% achieves 15.6\% gain on MATH and 9.1\% on HumanEval on Gemini models.
+% The two-turn structure (generate~$\to$ critique~$\to$ revise) directly
+% instantiates the critique loop that Critique DPO aims to train into
+% the base model.
+
+\subsubsection{CTRL: Teaching Critique via RL}
+
+\autocite{xie2025teachinglanguagemodelscritique} (CTRL) train a
+critic model with RL to maximise correction performance for a fixed
+generator, without requiring human supervision.  The approach produces
+critiques that serve as accurate generative reward signals and enables
+test-time scaling through iterative critique–revision cycles, with up
+to 106\% relative improvement on challenging code-generation
+benchmarks.
+
+\subsubsection{SuperCorrect}
+
+\autocite{yang2024supercorrect} introduce a two-stage framework: (1)
+hierarchical thought template distillation from a large teacher model,
+and (2) cross-model collaborative DPO training on teacher-guided
+error-correction traces.  SuperCorrect-7B surpasses DeepSeekMath-7B
+by 7.8\%/5.3\% on MATH/GSM8K.  The error-correction trace is a
+distilled form of the generative verifier output that Critique DPO
+proposes to include in the DPO loss.
+
+% \subsubsection{MultiCritique}
+
+% \autocite{lan2024multicritic} address the limitation that single-LLM
+% critiques—including those from GPT-4—contain systematic errors.
+% MultiCritique aggregates feedback from multiple LLM agents during both
+% SFT and RL stages to generate higher-quality critique training data,
+% achieving GPT-4-level critique quality with a fine-tuned 7B model.
+
+\subsubsection{Critique-GRPO}
+
+\autocite{zhang2025critiquegrpoadvancingllm} is the closest
+existing paper to Critique DPO's core proposal: it integrates
+natural-language critiques \emph{and} numerical rewards jointly in a
+GRPO-based RL framework.  The method enables LLMs to learn from both
+initial responses and critique-guided self-refinements simultaneously,
+achieving +4.4\% on Qwen2.5-7B-Base and +16.7\% pass@1 on AIME 2024.
+The key difference from Critique DPO is the use of GRPO rather than
+DPO, and the online RL rather than offline preference optimisation
+setting.
+
+\subsubsection{RL Tango: Joint Generator--Verifier Training}
+
+\autocite{zha2025rltangoreinforcinggenerator} simultaneously train
+both a policy generator and a generative process-level verifier using
+interleaved RL, with the verifier rewarded solely on outcome
+correctness without explicit process labels.  The co-evolving pair
+achieves best-in-class performance on competition mathematics while
+the verifier leads ProcessBench, providing practical evidence that the
+joint generator--verifier training loop in Critique DPO can work
+without pre-labelled critique data.
+
+% ============================================================
+\subsection{Generative Reward Models and Thinking LLM-as-Judge}
+\label{sec:thinking-judge}
+% ============================================================
+
+A third cluster directly extends the \emph{generative verifier} idea
+of \autocite{zhang2024generativeverifiersrewardmodeling} toward
+preference ranking and reward modelling at scale.
+
+\subsubsection{Prometheus 2 and RewardBench}
+
+\autocite{kim2024prometheus2} release Prometheus 2, an open-source
+evaluator LLM trained on a combined SFT + preference dataset that
+supports both direct assessment and pairwise ranking using custom
+scoring rubrics.  It achieves the highest correlation with human
+evaluators among open-source alternatives, confirming the utility of
+critique-style reasoning in evaluation.
+
+\autocite{lambert2024rewardbench} introduce RewardBench, the standard
+benchmark for evaluating reward models across chat, reasoning, and
+safety domains.  The benchmark's \emph{reasoning} category is the most
+relevant for evaluating Critique DPO-trained models, as it tests
+preference models specifically on mathematical and coding tasks.
+
+\subsubsection{EvalPlanner (Thinking LLM-as-a-Judge)}
+
+\autocite{saha2025evalplanner} train an evaluator LLM to generate an
+\emph{evaluation plan}, execute it through reasoning, and then deliver
+a final judgement.  A self-training loop with synthetic preference
+pairs iteratively refines the evaluation plans.  EvalPlanner achieves
+93.9 on RewardBench—state-of-the-art among generative reward models
+at the time of publication—demonstrating that planning-then-judging
+substantially outperforms direct preference prediction.
+
+\subsubsection{J1: Thinking LLM-as-a-Judge via RL}
+
+\autocite{whitehouse2025j1incentivizingthinkingllmasajudge}
+apply GRPO to teach judges to \emph{think before judging} by
+converting judgement tasks into formats with verifiable rewards and
+adding consistency-based reward bonuses to reduce positional bias.
+J1-Qwen-32B outperforms o1-mini, o3, and DeepSeek-R1-671B on several
+judge benchmarks, trained only on synthetic data.  The training
+methodology is essentially Critique DPO's core idea applied to a
+standalone judge model via RL.
+
+\subsubsection{RM-R1: Reward Modelling as Reasoning}
+
+\autocite{chen2025rmr1rewardmodelingreasoning}
+train Reasoning Reward Models (ReasRMs) in two stages: (1)
+chain-of-rubrics distillation from a large model, and (2) RL with
+verifiable rewards.  For chat tasks the model generates evaluation
+rubrics and justifications; for reasoning tasks it solves the problem
+itself before judging.  RM-R1 outperforms INF-ORM-Llama3.1-70B and
+GPT-4o on reward model benchmarks by up to 4.9\%, establishing that
+structured reasoning before scalar prediction is the right paradigm
+for reward modelling.
+
+\subsubsection{DeepSeek-GRM and Self-Principled Critique Tuning (SPCT)}
+
+\autocite{liu2025deepseekgrm} introduce SPCT, an online RL method
+where the reward model adaptively generates \emph{principles and
+  critiques} for each input before scoring, trained via RL to maximise
+downstream alignment quality.  Inference-time scaling is achieved by
+sampling multiple critique chains in parallel, guided by a
+meta-reward model.  SPCT achieves better performance than
+training-time scaling and avoids systematic biases present in
+traditional reward models.  This can be viewed as a production-scale
+implementation of the Critique DPO reward-modelling idea, with the
+critic output used directly as the reward signal.
+
+% \subsubsection{Think-J}
+
+% \autocite{huang2025thinkjlearningthinkgenerative}
+% build initial thinking ability in a judge model from curated reasoning
+% traces, then optimise via RL using both offline critic-guided
+% and online rule-based rewards.  The 32B model surpasses proprietary
+% judges including Claude 3.5 Sonnet and GPT-4o without extra human
+% annotations.  The critic-guided offline RL component mirrors the
+% Critique DPO mechanism of using a critic's CoT to construct the
+% preference signal.
+
+% % ============================================================
+% \subsection{DPO Theory and Iterative Variants}
+% \label{sec:dpo-theory}
+% % ============================================================
+
+% \subsubsection{Reinforced Token Optimisation (RTO)}
+
+% \autocite{zhong2024dpomeetspporeinforced} bridge DPO and PPO
+% by extracting token-level reward functions from DPO's implicit reward
+% and using them in PPO training.  RTO outperforms PPO by 7.5 points on
+% AlpacaEval 2, validating the token-level credit assignment view of DPO
+% that underlies step-level Critique DPO.
+
+% \subsubsection{Bootstrapping with DPO Implicit Rewards (DICE)}
+
+% \autocite{chen2024bootstrappinglanguagemodelsdpo} use DPO's implicit
+% reward to generate preference datasets for subsequent DPO rounds
+% without external feedback, achieving $>$8\% improvement in
+% length-controlled win rate on AlpacaEval 2.  DICE demonstrates that
+% the DPO implicit reward can self-improve through bootstrapping, an
+% important property for the iterative training loop in Critique DPO.
+
+% \subsubsection{Online Iterative RLHF}
+
+% \autocite{dong2024rlhfworkflowrewardmodeling} provide a reproducible
+% recipe for online iterative RLHF combining reward model training with
+% online DPO, demonstrating that online feedback substantially
+% outperforms offline DPO and providing a practical template for
+% integrating critique-structured rewards.
+
+% ============================================================
+% NEW BibTeX ENTRIES
+% Add these to refs.bib
+% ============================================================
+
+%% ---- Step-Level DPO ----
+
+% @inproceedings{zhang2024chainpreferenceoptimization,
+%   title   = {Chain of Preference Optimization: Improving
+%               Chain-of-Thought Reasoning in {LLMs}},
+%   author  = {Xuan Zhang and Chao Du and Tianyu Pang and
+%               Qian Liu and Wei Gao and Min Lin},
+%   booktitle = {NeurIPS},
+%   year    = {2024},
+%   eprint  = {2406.09136},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{lu2024stepcontrolleddpoleveragingstepwise,
+%   title   = {Step-Controlled {DPO}: Leveraging Stepwise Error
+%               for Enhanced Mathematical Reasoning},
+%   author  = {Zimu Lu and Aojun Zhou and Ke Wang and
+%               Houxing Ren and Weikang Shi and Junting Pan and
+%               Mingjie Zhan and Hongsheng Li},
+%   year    = {2024},
+%   eprint  = {2407.00782},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{hwang2024selfexporeenhancingmathematical,
+%   title   = {Self-Explore: Enhancing Mathematical Reasoning in
+%               Language Models with Fine-grained Rewards},
+%   author  = {Hyeonbin Hwang and Doyoung Kim and Seungone Kim and
+%               Seonghyeon Ye and Minjoon Seo},
+%   year    = {2024},
+%   eprint  = {2404.10346},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{yang2025thinkingpreferenceoptimization,
+%   title   = {Thinking Preference Optimization},
+%   author  = {Wang Yang and Hongye Jin and Jingfeng Yang and
+%               Vipin Chaudhary and Xiaotian Han},
+%   year    = {2025},
+%   eprint  = {2502.13173},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{gao2025uncoveringimpactchainofthought,
+%   title   = {Uncovering the Impact of Chain-of-Thought Reasoning
+%               for Direct Preference Optimization},
+%   author  = {(multiple)},
+%   year    = {2025},
+%   eprint  = {2502.11656},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{yuan2024eurus,
+%   title   = {Advancing {LLM} Reasoning Generalists with
+%               Preference Trees},
+%   author  = {Lifan Yuan and Ganqu Cui and Hanbin Wang and
+%               Ning Ding and others},
+%   year    = {2024},
+%   eprint  = {2404.02078},
+%   archivePrefix = {arXiv},
+% }
+
+%% ---- Process Reward Models ----
+
+% @inproceedings{lightman2023letsverifystepstep,
+%   title   = {Let's Verify Step by Step},
+%   author  = {Hunter Lightman and Vineet Kosaraju and Yura Burda
+%               and others},
+%   booktitle = {ICLR},
+%   year    = {2024},
+%   eprint  = {2305.20050},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{setlur2024rewardingprogressscalingautomated,
+%   title   = {Rewarding Progress: Scaling Automated Process
+%               Verifiers for {LLM} Reasoning},
+%   author  = {Amrith Setlur and Chirag Nagpal and Adam Fisch and
+%               Xinyang Geng and Jacob Eisenstein and Rishabh Agarwal
+%               and Alekh Agarwal and Jonathan Berant and
+%               Aviral Kumar},
+%   year    = {2024},
+%   eprint  = {2410.08146},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{yuan2024freeprocessrewardsprocess,
+%   title   = {Free Process Rewards without Process Labels},
+%   author  = {Lifan Yuan and Wendi Li and Huayu Chen and
+%               Ganqu Cui and Ning Ding and Kaiyan Zhang and
+%               Bowen Zhou and Zhiyuan Liu and Hao Peng},
+%   year    = {2024},
+%   eprint  = {2412.01981},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{cui2025primereinforcementprocessimplicit,
+%   title   = {Process Reinforcement through Implicit Rewards},
+%   author  = {Ganqu Cui and Lifan Yuan and Zefan Wang and
+%               Hanbin Wang and Yuchen Zhang and others},
+%   year    = {2025},
+%   eprint  = {2502.01456},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{khalifa2025thinkprmprocessrewardmodels,
+%   title   = {Process Reward Models That Think},
+%   author  = {Muhammad Khalifa and Rishabh Agarwal and
+%               Lajanugen Logeswaran and Jaekyeom Kim and Hao Peng
+%               and Moontae Lee and Honglak Lee and Lu Wang},
+%   year    = {2025},
+%   eprint  = {2504.16828},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{zhao2025genprm,
+%   title   = {{GenPRM}: Scaling Test-Time Compute of Process
+%               Reward Models via Generative Reasoning},
+%   author  = {Jian Zhao and Runze Liu and Kaiyan Zhang and
+%               Zhimu Zhou and others},
+%   year    = {2025},
+%   eprint  = {2504.00891},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{zhang2025lessonsdevelopingprocessreward,
+%   title   = {The Lessons of Developing Process Reward Models in
+%               Mathematical Reasoning},
+%   author  = {Zhenru Zhang and Chujie Zheng and Yangzhen Wu and
+%               Beichen Zhang and Runji Lin and Bowen Yu and
+%               Dayiheng Liu and Jingren Zhou and Junyang Lin},
+%   year    = {2025},
+%   eprint  = {2501.07301},
+%   archivePrefix = {arXiv},
+% }
+
+% @inproceedings{zhang2024restmcts,
+%   title   = {{ReST-MCTS*}: {LLM} Self-Training via Process Reward
+%               Guided Tree Search},
+%   author  = {Dan Zhang and Sining Zhoubian and Ziniu Hu and
+%               Yisong Yue and Yuxiao Dong and Jie Tang},
+%   booktitle = {NeurIPS},
+%   year    = {2024},
+%   eprint  = {2406.03816},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{guan2025rstarmathsmallllms,
+%   title   = {rStar-Math: Small {LLMs} Can Master Math Reasoning
+%               with Self-Evolved Deep Thinking},
+%   author  = {Xinyu Guan and Li Lyna Zhang and Yifei Liu and
+%               Ning Shang and Youran Sun and Yi Zhu and Fan Yang
+%               and Mao Yang},
+%   year    = {2025},
+%   eprint  = {2501.04519},
+%   archivePrefix = {arXiv},
+% }
+
+%% ---- GRPO / Reasoning RL ----
+
+% @misc{shao2024deepseekmath,
+%   title   = {{DeepSeekMath}: Pushing the Limits of Mathematical
+%               Reasoning in Open Language Models},
+%   author  = {Zhihong Shao and Peiyi Wang and Qihao Zhu and
+%               Runxin Xu and Junxiao Song and others},
+%   year    = {2024},
+%   eprint  = {2402.03300},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{deepseekai2025deepseekr1,
+%   title   = {{DeepSeek-R1}: Incentivizing Reasoning Capability in
+%               {LLMs} via Reinforcement Learning},
+%   author  = {{DeepSeek-AI}},
+%   year    = {2025},
+%   eprint  = {2501.12948},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{kimiteam2025kimik15,
+%   title   = {Kimi k1.5: Scaling Reinforcement Learning with
+%               {LLMs}},
+%   author  = {{Kimi Team}},
+%   year    = {2025},
+%   eprint  = {2501.12599},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{yu2025dapo,
+%   title   = {{DAPO}: An Open-Source {LLM} Reinforcement Learning
+%               System at Scale},
+%   author  = {Qiying Yu and Zheng Zhang and Ruofei Zhu and
+%               Yufeng Yuan and others},
+%   year    = {2025},
+%   eprint  = {2503.14476},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{liu2025vapo,
+%   title   = {{VAPO}: Efficient and Reliable Reinforcement Learning
+%               for Advanced Reasoning Tasks},
+%   author  = {{Bytedance Seed Team}},
+%   year    = {2025},
+%   eprint  = {2504.05118},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{lambert2024tulu3,
+%   title   = {Tulu 3: Pushing Frontiers in Open Language Model
+%               Post-Training},
+%   author  = {Nathan Lambert and Jacob Morrison and
+%               Valentina Pyatkin and others},
+%   year    = {2024},
+%   eprint  = {2411.15124},
+%   archivePrefix = {arXiv},
+% }
+
+%% ---- Critique / Self-Correction ----
+
+% @misc{mcaleese2024llmcriticshelpllm,
+%   title   = {{LLM} Critics Help Catch {LLM} Bugs},
+%   author  = {Nat McAleese and Rai Michael Pokorny and
+%               Juan Felipe Ceron Uribe and Evgenia Nitishinskaya
+%               and Maja Trebacz and Jan Leike},
+%   year    = {2024},
+%   eprint  = {2407.00215},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{kumar2024traininglanguagemodelsselfcorrect,
+%   title   = {Training Language Models to Self-Correct via
+%               Reinforcement Learning},
+%   author  = {Aviral Kumar and Vincent Zhuang and Rishabh Agarwal
+%               and Yi Su and others},
+%   year    = {2024},
+%   eprint  = {2409.12917},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{xie2025teachinglanguagemodelscritique,
+%   title   = {Teaching Language Models to Critique via
+%               Reinforcement Learning},
+%   author  = {Zhihui Xie and Jie Chen and Liyu Chen and
+%               Weichao Mao and Jingjing Xu and Lingpeng Kong},
+%   year    = {2025},
+%   eprint  = {2502.03492},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{yang2024supercorrect,
+%   title   = {{SuperCorrect}: Advancing Small {LLM} Reasoning with
+%               Thought Template Distillation and Self-Correction},
+%   author  = {Ling Yang and Zhaochen Yu and Tianjun Zhang and
+%               Minkai Xu and Joseph E. Gonzalez and Bin Cui and
+%               Shuicheng Yan},
+%   year    = {2024},
+%   eprint  = {2410.09008},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{lan2024multicritic,
+%   title   = {Training Language Models to Critique With
+%               Multi-agent Feedback},
+%   author  = {Tian Lan and Wenwei Zhang and Chengqi Lyu and
+%               Shuaibin Li and Chen Xu and others},
+%   year    = {2024},
+%   eprint  = {2410.15287},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{zhang2025critiquegrpoadvancingllm,
+%   title   = {{Critique-GRPO}: Advancing {LLM} Reasoning with
+%               Natural Language and Numerical Feedback},
+%   author  = {Xiaoying Zhang and Hao Sun and Yipeng Zhang and
+%               Kaituo Feng and Chaochao Lu and Chao Yang and
+%               Helen Meng},
+%   year    = {2025},
+%   eprint  = {2506.03106},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{zha2025rltangoreinforcinggenerator,
+%   title   = {{RL Tango}: Reinforcing Generator and Verifier
+%               Together for Language Reasoning},
+%   author  = {Kaiwen Zha and Zhengqi Gao and Maohao Shen and
+%               Zhang-Wei Hong and Duane S. Boning and Dina Katabi},
+%   year    = {2025},
+%   eprint  = {2505.15034},
+%   archivePrefix = {arXiv},
+% }
+
+%% ---- Thinking Judges / Reasoning Reward Models ----
+
+% @inproceedings{kim2024prometheus2,
+%   title   = {Prometheus 2: An Open Source Language Model
+%               Specialized in Evaluating Other Language Models},
+%   author  = {Seungone Kim and Juyoung Suk and Shayne Longpre and
+%               Bill Yuchen Lin and others},
+%   booktitle = {EMNLP},
+%   year    = {2024},
+%   eprint  = {2405.01535},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{lambert2024rewardbench,
+%   title   = {{RewardBench}: Evaluating Reward Models for Language
+%               Modeling},
+%   author  = {Nathan Lambert and Valentina Pyatkin and
+%               Jacob Morrison and LJ Miranda and Bill Yuchen Lin
+%               and others},
+%   year    = {2024},
+%   eprint  = {2403.13787},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{saha2025evalplanner,
+%   title   = {Learning to Plan \& Reason for Evaluation with
+%               Thinking-{LLM}-as-a-Judge},
+%   author  = {Swarnadeep Saha and Xian Li and
+%               Marjan Ghazvininejad and Jason Weston and
+%               Tianlu Wang},
+%   year    = {2025},
+%   eprint  = {2501.18099},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{whitehouse2025j1incentivizingthinkingllmasajudge,
+%   title   = {J1: Incentivizing Thinking in {LLM}-as-a-Judge via
+%               Reinforcement Learning},
+%   author  = {Chenxi Whitehouse and Tianlu Wang and Ping Yu and
+%               Xian Li and Jason Weston and Ilia Kulikov and
+%               Swarnadeep Saha},
+%   year    = {2025},
+%   eprint  = {2505.10320},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{chen2025rmr1rewardmodelingreasoning,
+%   title   = {{RM-R1}: Reward Modeling as Reasoning},
+%   author  = {Xiusi Chen and others},
+%   year    = {2025},
+%   eprint  = {2505.02387},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{liu2025deepseekgrm,
+%   title   = {Inference-Time Scaling for Generalist Reward
+%               Modeling},
+%   author  = {Zijun Liu and Peiyi Wang and Runxin Xu and
+%               Shirong Ma and Chong Ruan and Peng Li and
+%               Yang Liu and Yu Wu},
+%   year    = {2025},
+%   eprint  = {2504.02495},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{huang2025thinkjlearningthinkgenerative,
+%   title   = {Think-J: Learning to Think for Generative
+%               {LLM}-as-a-Judge},
+%   author  = {Hui Huang and Yancheng He and Hongli Zhou and
+%               Rui Zhang and Wei Liu and Weixun Wang and
+%               Jiaheng Liu and Wenbo Su},
+%   year    = {2025},
+%   eprint  = {2505.14268},
+%   archivePrefix = {arXiv},
+% }
+
+%% ---- DPO Theory / Iterative ----
+
+% @misc{zhong2024dpomeetspporeinforced,  % already in refs.bib
+% }
+
+% @misc{chen2024bootstrappinglanguagemodelsdpo,
+%   title   = {Bootstrapping Language Models with {DPO} Implicit
+%               Rewards},
+%   author  = {Changyu Chen and Zichen Liu and Chao Du and
+%               Tianyu Pang and Qian Liu and Arunesh Sinha and
+%               Pradeep Varakantham and Min Lin},
+%   year    = {2024},
+%   eprint  = {2406.09760},
+%   archivePrefix = {arXiv},
+% }
+
+% @misc{dong2024rlhfworkflowrewardmodeling,
+%   title   = {{RLHF} Workflow: From Reward Modeling to Online
+%               {RLHF}},
+%   author  = {Hanze Dong and Wei Xiong and Bo Pang and
+%               Haoxiang Wang and Han Zhao and Yingbo Zhou and
+%               Nan Jiang and Doyen Sahoo and Caiming Xiong and
+%               Tong Zhang},
+%   year    = {2024},
+%   eprint  = {2405.07863},
+%   archivePrefix = {arXiv},
+% }
