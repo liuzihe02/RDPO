@@ -1,0 +1,61 @@
+
+\subsection{Models and Datasets}
+
+\textbf{Models}
+\begin{itemize}
+    \item \textbf{DeepSeek-R1-Distill-Qwen-1.5B} AIME 2024 pass@1: 28.9, AIME 2024 cons@64: 52.7, MATH-500 pass@1: 83.9, GPQA Diamond pass@1: 33.8, LiveCodeBench pass@1: 16.9, CodeForces rating: 954
+    \item \textbf{Qwen2.5-0.5B, 1.5B, 3B}
+    \item \textbf{Llama 3.2 1B QLoRA} MMLU: 49, TLDR(9+):16.8, GSM8K:46.5, MATH: 31, GPQA:25.9
+    \item \textbf{Gemma 2 PT 2B} MMLU (5-shot, top-1): 43.0, HellaSwag (0-shot): 71.3, PIQA (0-shot): 76.0, SocialIQA (0-shot): 62.2, BoolQ (0-shot): 72.5, WinoGrande (partial score): 70.9, ARC-e (20-shot): 51.0, ARC-c (25-shot): 55.4, TriviaQA (0-shot): 54.2, Natural Questions (0-shot): 15.6, HumanEval (pass@1): 27.9, MBPP (2-shot): 30.5, GSM8K (5-shot, maj@1): 29.3, MATH (5-shot): 11.0, AGIEval (0-shot): 26.2, BBH (3-shot): 40.2, DROP (0-shot): 32.3, BIG-Bench (3-shot, CoT): 41.9
+
+\end{itemize}
+
+\textbf{Datasets}
+\begin{itemize}
+    \item Math: GSM8K, MATH, ARC-Reasoning Challenge
+    \item Code: HumanEval, SWE-Bench, BigCodeBench
+    \item GPQA (Gradute level QA dataset)
+    \item Preference Datasets: RewardBench, HelpSteer2, UltraFeedback
+    \item Real World Tasks: WildBench, TL;DR-17
+\end{itemize}
+
+\clearpage
+\begin{table*}[t]
+    \centering
+    \caption{Comparison of Datasets and Models for Preference Learning Papers}
+    \label{tab:comparison}
+    \renewcommand{\arraystretch}{1.5}  % Increases line spacing by 30%
+    \small
+    \begin{tabular}{|p{4cm}|p{4cm}|p{8cm}|}
+        \hline
+        \textbf{Paper}                                                                                                              & \textbf{Models Used}                                                                                                   & \textbf{Datasets}                                                                                                                                                                                                            \\
+        \hline
+        RLAIF vs. RLHF: Scaling Reinforcement Learning from Human Feedback with AI Feedback \autocite{lee2024rlaifvsrlhfscaling}    & PaLM- XS, PaLM-2 Large                                                                                                 & Reddit TL;DR, \newline OpenAI's Human Preferences (subset of Reddit TL;DR) \newline Anthropic HHH Preferences                                                                                                                \\
+        \hline
+        V-STaR: Training Verifiers for Self-Taught Reasoners \autocite{hosseini2024vstartrainingverifiersselftaught}                & Llama 2 and CodeLlama 7B and 13B                                                                                       & Math: GSM8K, MATH, HumanEval \newline Coding: MBPP, HumanEval                                                                                                                                                                \\
+        \hline
+        Generative Verifiers: Reward Modeling as Next-Token Prediction \autocite{zhang2024generativeverifiersrewardmodeling}        & Coding: Gemma-2B \newline Math: Gemma 2B, 7B, Gemma-2 9B                                                               & Coding: Big-Bench \newline Math: GSM8K, MATH                                                                                                                                                                                 \\
+        \hline
+        HRLAIF \autocite{li2024hrlaifimprovementshelpfulnessharmlessness}                                                           & Llama-2 13B                                                                                                            & BeaverTails, GSM8K, MMLU,HumanEval,ToxiGen                                                                                                                                                                                   \\
+        \hline
+        Self-Rewarding Language Models \autocite{yuan2024selfrewardinglanguagemodels}                                               & Llama-2 70B                                                                                                            & OpenAssistant Conversations                                                                                                                                                                                                  \\
+        \hline
+        Pairwise Cringe Loss \autocite{xu2024thingscringeothersiterative}                                                           & GPT2-Medium, Llama-7b                                                                                                  & BASE, AlpacaFarm                                                                                                                                                                                                             \\
+        \hline
+        Iterative Reasoning Preference Optimization for Language Models \autocite{pang2024iterativereasoningpreferenceoptimization} & Llama-2 70B                                                                                                            & GSM8K, ARC (AI2 Reasoning Challenge), MATH                                                                                                                                                                                   \\
+        \hline
+        Thinking LLMs \autocite{wu2024thinkingllmsgeneralinstruction}                                                               & Llama-3-8B-Instruct                                                                                                    & UltraFeedback, AlpacaEval 2, Arena-Hard, GSM8K, WildChat                                                                                                                                                                     \\
+        \hline
+        Direct Judgement Preference Optimization \autocite{wang2024directjudgementpreferenceoptimization}                           & Llama-3.1-8B-Judge, NeMo-Instruct-8B                                                                                   & InstruSum, Auto-J(Eval-P set), HHH, LFQA, EvalBiasBench, PreferenceBench, BiGGenBench, FLASK, MT Bench, FeedbackBench, LLM-AggreFact, InfoBench, UltraFeedback, Alpaca-Eval-2                                                \\
+        \hline
+        Self-Taught Evaluators \autocite{wang2024selftaughtevaluators}                                                              & Llama3-70B-Instruct, Mixtral 22Bx8 Instruct, GPT-4                                                                     & WildChat, RewardBench, MT-Bench, HelpSteer 2, GSM8K, hh-rlhf                                                                                                                                                                 \\
+        \hline
+        Improving Reward Models with Language Model Critiques \autocite{ye2024improvingrewardmodelssynthetic}                       & LLaMA2-7B-Chat, LLaMA2-70B-Chat, Mixtral-8x7B-Instruct, Command R (35B parameter model), Command R+ (103B), GPT4-Turbo & WildChat, RewardBench, PandaLM                                                                                                                                                                                               \\
+        \hline
+        Critique-out-Loud (CLoud) Reward Models \autocite{ankner2024critiqueoutloudrewardmodels}                                    & Llama-3 Family                                                                                                         & UltraFeedback, UltraInteract, UltraLlama, RewardBench, Arena-Hard                                                                                                                                                            \\
+        \hline
+        Critic-RM \autocite{yu2025selfgeneratedcritiquesboostreward}                                                                & Llama-3 Family, GPT-4o, Gemini-1.5-pro                                                                                 & RewardBench, CrossEval, QA Feedback, SHP, CriticBench \newline Public Preference Datasets (ChatArena, Alpaca-Farm-Human-Pref, HelpSteer2, Evol-instruct, PKU-SafeRLHF), \newline Synthetic Preference Datasets (GSM8K, MATH) \\
+
+        \hline
+    \end{tabular}
+\end{table*}

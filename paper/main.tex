@@ -1,0 +1,412 @@
+\documentclass[11pt,fleqn]{article}
+%\usepackage{palatino,geometry,setspace,hyperref}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{palatino,geometry}
+\usepackage{amsthm}
+\usepackage{graphicx}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage[colorlinks=true, linkcolor=blue, urlcolor=blue, citecolor=blue]{hyperref}
+
+%formatting
+\usepackage{float}
+
+\usepackage{listings}
+\usepackage{xcolor}        % for color (optional, but recommended)
+
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+% Define a 'json' language for listings
+\lstdefinelanguage{json}{
+    string=[s]{"}{"},
+    comment=[l]{:\ "},  % not strictly necessary; just an example of customizing
+    morestring=[b]',
+    basicstyle=\footnotesize\ttfamily,
+    keywordstyle=\color{blue},
+    stringstyle=\color{orange},
+    commentstyle=\color{gray},
+    showstringspaces=false
+}
+
+\lstset{
+    breaklines=true,
+    frame=none,
+    basicstyle=\small\ttfamily
+}
+
+
+\geometry{a4paper,tmargin=10mm,bmargin=20mm,lmargin=20mm,rmargin=14mm}
+
+
+\usepackage[english]{babel}
+\usepackage{caption}
+\usepackage{subcaption}
+
+% citations
+\usepackage[
+	backend=biber, % Use the biber backend for compiling the bibliography
+	style=ext-authoryear, % In-text citation style
+        maxcitenames=1, % only one author max
+	sorting=none, % Order references in the order in which they are used in the document
+]{biblatex}
+
+% Make autocite have black brackets but blue citation text
+\DeclareCiteCommand{\autocite}
+  {\usebibmacro{prenote}}
+  {[{\textcolor{blue}{\usebibmacro{cite}}}]}
+  {\multicitedelim}
+  {\usebibmacro{postnote}}
+
+% Add comma between author and year
+\DeclareDelimFormat{nameyeardelim}{\addcomma\space}
+\addbibresource{refs.bib}
+
+% \title{Prompt Optimization \\\vspace{5mm} \small{University College London Centre for AI Research Note}}
+\title{Critique DPO}
+\author{Zihe Liu, Peter Hayes}
+
+
+\newcommand{\david}[1]{\textcolor{blue}{David: #1}}
+\newcommand{\ph}[1]{{\color{red}{[PH: #1]}}}
+
+\usepackage{mdframed}
+\usepackage{caption}
+
+\newenvironment{aside}
+  {\begin{mdframed}[style=0,%
+      leftline=false,rightline=false,leftmargin=2em,rightmargin=2em,%
+          innerleftmargin=0pt,innerrightmargin=0pt,linewidth=0.75pt,%
+      skipabove=7pt,skipbelow=7pt]\small}
+  {\end{mdframed}}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+    This is \textit{very much} a work-in-progress document, which reviews how generative verifiers can be implemented and simple experimental results. Much of this current version are disjointed concepts and messy; my current task is to tidy these reviews up and include the experimental results.
+\end{abstract}
+
+
+\section{Introduction}
+
+As large language models (LLMs) become more capable, fine-tuning techniques to align with human intent are increasingly important. A key consideration for aligning these models is how to most effectively use human resources, or model resources in the case where LLMs themselves are used as oracles. Reinforcement learning from Human or AI preferences (RLHF/RLAIF) is the most prominent example of such a technique but is complex and often unstable. Direct Preference Optimization (DPO) has recently been proposed as a simpler and more stable alternative. In this note, we explore how to expand the DPO objective to make better use of feedback data from the human or AI oracles. Specifically, we incorporate the Chain-Of-Thought reasoning of a generative verifier (acting to verify and critique the validity of base models) in the DPO loss term for the base model.
+
+Asking these oracles to provide reasoning for their binary preferences is common practice. In particular, for LLM-as-a-judge style workflows asking the model to provide reasoning (or so-called chain-of-thought) has been shown to actually improve the model predictions, or verifications in the case of generative verifiers. How can we leverage this rationale when fine-tuning our target model to improve performance in a more data-efficient manner?
+
+\section{Background}
+
+\subsection{DPO}
+For a given prompt $x$, two completions are sampled from the model ($y_{0}, y_{1}) \sim p_{\theta}(y | x)$ and an oracle judges which they prefer. We denote $y_{w}$ as the preferred completion and $y_{l}$ as the other. Typically, the oracle is a human participant; however, the use of LLMs to instead provide feedback has also shown great promise. This process is repeated over $N$ prompts resulting in the pairwise preference dataset $\mathcal{X}_{P} = \{x, y_{w}, y_{l}\}^{N}$
+
+During the reward modelling phase in RLHF, the preference data is assumed to follow the Bradley-Terry (BT) model. The objective for training the reward model can be framed as a binary classification task with a cross entropy objective:
+\begin{equation}
+    \mathcal{L}_{\phi}(\mathcal{X}_{P})= - \mathbb{E}_{ \mathcal{X}_{P}} [\log \sigma(r_{\phi}(x, y_{w}) - r_{\phi}(x, y_{l}))].
+    \label{eq:reward-model-objective}
+\end{equation}
+During the subsequent RL fine-tuning phase, the trained reward model is then used to score prompt/completion pairs to provide feedback to the language model. The aim is to maximise the following objective w.r.t $\theta$
+\begin{equation}
+    \mathbb{E}_{x \sim \mathcal{X}, y \sim p_{\theta}(y | x) } [r_{\phi}(x, y)] - \beta \mathrm{KL}(p_{\theta}(y | x) || p_{\theta_{0}}(y | x)).
+    \label{eq:ppo-objective}
+\end{equation}
+The second term here regularises the fine-tuned model using the KL-divergence to stay close to the state of the LLM before fine-tuning $p_{\theta_{0}}(y | x)$. The main rationale provided for this is to prevent the model from deviating too far from the distribution on which the reward model is accurate.
+
+In practise the following reward function is used with PPO to update $\theta$.
+
+\begin{equation}
+    r_{ppo}(x, y) = r_{\phi}(x, y) - \beta(\log p_{\theta}(y|x) - \log p_{\theta_{0}}(y | x)).
+\end{equation}
+DPO is derived from the optimal solution to \eqref{eq:ppo-objective}; providing a maximum likelihood objective analogous to equation \eqref{eq:reward-model-objective}, but parameterised by $\theta$ instead of $\phi$;
+\begin{equation}
+    \mathcal{L}_{\theta}(\mathcal{X}_{P}) = - \mathbb{E}_{\mathcal{X}_{P}}
+    \left[ \log \sigma
+        \left(
+        \hat{r}(x, y_{w})
+        - \hat{r}(x, y_{l})
+        \right)
+        \right],
+    \label{eq:dpo_loss}
+\end{equation}
+where we have the \textit{implicit reward model}
+\begin{equation}
+    \hat{r}(x, y) = \beta \log\frac{p_\theta(y|x)}{p_{\theta_{0}}(y|x)}.
+    \label{eq:implicit_reward}
+\end{equation}
+This formulation has the distinct advantage of not requiring the explicit reward modeling step and avoids the need to perform any reinforcement learning. Furthermore, it has been shown to outperform RLHF in a range of experiments \autocite{rafailov2024directpreferenceoptimizationlanguage}
+
+In this work we will suggest simple to implement extensions to this objective.
+
+\section{Literature Review}
+
+We review research using reasoning data into the RL fine-tuning process.
+
+\subsection{RLAIF}
+
+\autocite{bai2022constitutionalaiharmlessnessai} first introduce RL from AI Feedback (RLAIF) to fine-tune models to be helpful and harmless. They use human labels for helpfulness, but LLM-generated labels for ranking harmlessness responses. They experiment with Chain-Of-Thought (CoT) prompting to generate the preferences to rank harmlessness, and find the RL-CAI with CoT seems slightly less helpful but slightly more harmless compared to without CoT. \autocite{lee2024rlaifvsrlhfscaling} compare RLAIF with RLHF on summarization, helpful dialogue generation, and harmless dialogue generation. Experiments show RLAIF achieve comparable, or even better, performance than RLHF even when the labeller model is the same as the base policy model. Again, experiments show CoT created minimal gains in the quality of post-RLAIF model. \autocite{guo2024directlanguagemodelalignment} use LLM as a judge to rank preferences for DPO.
+
+\subsection{Using CoT for Increased Reasoning Capability}
+
+\subsubsection{STaR: Self-Taught Reasoner}
+
+STaR \autocite{zelikman2022starbootstrappingreasoningreasoning} first used CoT data for better performance. They used an iterative approach for improving LLM performance through rationale-based fine-tuning. Given a pretrained model $M$ and a dataset $D = \{(x_i, y_i)\}_{i=1}^n$, we start with a small prompt set $\mathcal{P} = \{(x_i^p, r_i^p, y_i^p)\}_{i=1}^P$ where $P \ll D$ that includes examples with their rationales $r$ and answers $y$. For each example in $D$, we concatenate the prompt set to form $x_i = (x_1^p, r_1^p, y_1^p, \ldots, x_P^p, r_P^p, y_P^p, x_i)$. The model generates rationales $\hat{r}_i$ and answers $\hat{y}_i$. We filter to keep only rationales that lead to correct answers ($\hat{y}_i = y_i$), fine-tune $M$ on this filtered dataset, and iterate this process. Importantly, each iteration starts from the original pre-trained model $M$ to prevent overfitting. The process continues until performance convergence.
+
+\subsubsection{V-STaR: Training Verifiers for Self-Taught Reasoners}
+
+Similarly, V-STaR \autocite{hosseini2024vstartrainingverifiersselftaught} use an iterative approach to train a generator $G^t$ and verifier $V^t$. For each problem in the training data, we sample $k$ completions from the generator: $\{\hat{y}_i \sim G(\cdot|\mathbf{x}_i): i \in \mathcal{D}_{query}\}$. The generated solutions are labeled for correctness ($z$) using ground truth answers or test cases. We use only correct generated solutions ($z=1$) to augment the generator training data $\mathcal{D}_{GEN}$. Both correct and incorrect solutions are added to verifier data $\mathcal{D}_{VER}$ with their correctness labels as $(\mathbf{x}_i, \hat{y}_{ij}, z_{ij})$, enabling the verifier to learn from generator mistakes. At iteration $t$, generator $G^t$ is obtained by fine-tuning the pretrained model on the augmented $\mathcal{D}_{GEN}$. We sample solutions again from this generator $G^t$. The verifier $V^t$ is obtained by using $\mathcal{D}_{VER}$ with DPO to fine-tune a base model $G_{SFT}$, with preference datasets for correct and incorrect answers. This process repeats for up to $T$ iterations to iteratively augment $\mathcal{D}_{GEN}$ and $\mathcal{D}_{VER}$, $V^t$ and $G^t$.
+
+
+\subsubsection{Generative Verifiers: Reward Modeling as Next-Token Prediction}
+
+The prevalent approach for training verifiers in reasoning domains is to fine-tune an LLM as a classifier on a dataset of correct and incorrect solutions generated from a fixed LLM, using binary cross-entropy loss. These verifiers directly assign a numerical score $r_\theta(x,y) \in [0,1]$ to estimate the probability that a solution $y$ is correct for a problem $x$. Discriminative LLM-based verifiers do not utilize the text generation capabilities of pretrained LLMs. To address this issue, we \autocite{zhang2024generativeverifiersrewardmodeling} propose training generative verifiers , which we call GenRM, using standard next-token prediction. GenRM represents solution correctness using the LLM's probability distribution over tokens, instead of predicting a separate numerical score.
+
+\vspace{1em}
+% use * for a small unlabelled section
+\textbf{Direct Verifier} In its simplest form, GenRM predicts whether a solution is correct using a single 'Yes' or 'No' token. This can be done by maximizing $\log p_\theta(\text{'Yes'}|(x,y^+))$ for correct solutions $y^+$ and $\log p_\theta(\text{'No'}|(x,y^-))$ for incorrect solutions $y^-$. To do so, we minimize the SFT loss in (2) on the dataset $\mathcal{D}_{\text{Direct}}$ containing problem-solution pairs and a 'Yes' or 'No' verification token:
+
+\begin{equation}
+    \mathcal{D}_{\text{Direct}} = \{(x,y^+,I), \text{'Yes'}\} \cup \{(x,y^-,I), \text{'No'}\}
+\end{equation}
+
+where $I = \text{'Is the answer correct (Yes/No)?'}$. At inference, we use the likelihood of the 'Yes' token as the verifier's score for re-ranking solutions.
+
+\vspace{1em}
+\textbf{Unifying Generation and Verification}
+GenRM seamlessly integrates reward modeling with SFT for generating correct solutions. This can be done by simply changing the data mixture in the SFT loss (2) to include both verification and generation tasks. Given a verification dataset $\mathcal{D}_{\text{verify}}$, which can be $\mathcal{D}_{\text{Direct}}$ or $\mathcal{D}_{\text{CoT}}$, GenRM minimizes the loss:
+
+\begin{equation}
+    \mathcal{L}_{\text{GenRM}}(\theta, \mathcal{D}_{\text{verify}}) = \mathcal{L}_{\text{SFT}}(\theta, \mathcal{D}_{\text{verify}}) + \lambda\mathcal{L}_{\text{SFT}}(\theta, \mathcal{D}_{\text{correct}})
+\end{equation}
+
+where $\lambda > 0$ controls the mixture ratio between verification and generating correct solutions. This unified training can improve performance via positive transfer between these related tasks.
+
+\vspace{1em}
+\textbf{Chain-of-Thought Verifiers (GenRM-CoT)}
+Since verification often involves nuanced reasoning, generative verifiers can naturally benefit from Chain-of-Thought (CoT). We can generate intermediate reasoning steps before making a decision about correctness, which may identify subtle errors missed by direct verifiers. To train CoT verifiers, we minimize the SFT loss $\mathcal{L}_{\text{GenRM}}$ on dataset $\mathcal{D}_{\text{CoT}}$ containing problem-solution pairs and corresponding verification rationales $v_{\text{CoT}}$ appended with a final question $I$ and 'Yes' or 'No' token:
+
+\begin{equation}
+    \mathcal{D}_{\text{CoT}} = \{(x,y^+,I_{\text{CoT}}), (v_{\text{CoT}},I,\text{'Yes'})\} \cup \{(x,y^-,I_{\text{CoT}}), (v_{\text{CoT}},I,\text{'No'})\}
+\end{equation}
+
+where $I_{\text{CoT}} = \text{'Let's verify step by step.'}$. During inference, we first generate a CoT rationale and then use the probability of 'Yes' for assigning the correctness score.
+
+\vspace{1em}
+\textbf{Data} for the CoT verification rationales $v_{\text{CoT}}$ is available \href{https://github.com/gen-agent/genrm-data/tree/main}{here}
+
+\subsection{Using CoT in Preference Optimization}
+
+These methods enrich data with reasoning annotations (e.g., explanations, corrections, step-by-step rationales) in the preference optimization setup.
+
+\subsubsection{Using Reasoning for Improved LLM Preference Ranking}
+
+In the RLAIF process, \autocite{li2024hrlaifimprovementshelpfulnessharmlessness} instruct the LLM labeller to use the reasoning behind the generation of preference data to rank correctness of the preference pairs. They also use CoT prompting for the LLM labelling.
+
+\subsubsection{Self Rewarding Language Models}
+
+\autocite{yuan2024selfrewardinglanguagemodels} use language models to generate candidate responses, provide its own rewards to these responses, filter for good responses, and do iterative fine-tuning on these good responses. As the model can both improve its generation ability, and act as its own reward model through the same generation mechanism, this means the reward model itself can improve through these iterations, deviating from standard practices where the reward model is fixed.
+
+\vspace{1em}
+\textbf{Self-Instruction Creation} We generate a new prompt $x_i$ every iteration using few-shot prompting, sampling prompts from original seed data. We then generate $N$ diverse candidate responses $\{y^1_i, ..., y^N_i\}$ for the given prompt $x_i$ from our model using sampling. Finally, we use the LLM-as-a-Judge ability of our \textit{same model} to evaluate its own candidate responses with scores $r^n_i \in [0, 5]$.
+
+\vspace{1em}
+\textbf{AI Feedback Training}
+After performing the self-instruction creation procedure, we can augment the seed data with additional examples for training, which we refer to as AI Feedback Training (AIFT) data. To do this, we construct preference pairs, which are training data of the form (instruction prompt $x_i$, winning response $y^w_i$, losing response $y^l_i$). To form the winning and losing pair we take the highest and lowest scoring responses from the $N$ evaluated candidate responses, discarding the pair if their scores are the same. These pairs can be used for training with a preference tuning algorithm DPO.
+
+\vspace{1em}
+\textbf{Iterative Training}
+Our overall procedure trains a series of models $M_1, ..., M_T$ where each successive model $t$ uses augmented training data created by the $t-1^{th}$ model. We thus define AIFT($M_t$) to mean AI Feedback Training data created using model $M_t$. This iterative training resembles the procedure used in Pairwise Cringe Optimization and specifically is termed Iterative DPO, introduced in \autocite{xu2024thingscringeothersiterative}; however, an external fixed reward model was used in that work.
+
+\subsubsection{Iterative Preference Optimization}
+
+\autocite{pang2024iterativereasoningpreferenceoptimization} optimize the preference between competing generated Chain-of-Thought (CoT) candidates by optimizing for winning vs. losing reasoning steps. The use a modified form of the DPO loss with an additional NLL term on the reasoning data. There is a large improvement from 55.6\% to 81.6\% on GSM8K, and other math benchmarks like MATH and ARC-Challenge.
+
+The authors first construct a dataset of preference pairs, with each pair consisting of a winning (correct) answer and losing (incorrect) answer, along with the LLM's reasoning chain $c_i$ : $D^{\text{pairs}} = \{(c_i^{w_k}, y_i^{w_k}), (c_i^{l_k}, y_i^{l_k})$. Note that due to the task of math reasoning, the reward is binary, either 1 or 0 depending on whether the final answer $y_i$ was correct or not. Given the preference pairs, they then train a new model $M_\theta$ that will become the next model $M_{i+1}$. A sum of the DPO loss and NLL loss over the reasoning chain is used
+
+\begin{align}
+    \mathcal{L}_{\text{DPO+NLL}} & = \mathcal{L}_{\text{DPO}}(c_i^w, y_i^w, c_i^l, y_i^l|x_i) + \alpha\mathcal{L}_{\text{NLL}}(c_i^w, y_i^w|x_i) \nonumber                                                                                                                  \\
+                                 & = -\log \sigma \left(\beta \log \frac{M_\theta(c_i^w, y_i^w|x_i)}{M_i(c_i^w, y_i^w|x_i)} - \beta \log \frac{M_\theta(c_i^l, y_i^l|x_i)}{M_i(c_i^l, y_i^l|x_i)}\right) - \alpha \frac{\log M_\theta(c_i^w, y_i^w|x_i)}{|c_i^w| + |y_i^w|}
+    \label{eq:DPO_NLL}
+\end{align}
+
+Here $M(x)$ denotes the probability of sequence $x$ under the model $M$, and $\sigma$ is the sigmoid function. We use the previous iteration's model $M_i$ as the reference model in the denominator of the DPO term. Note that the NLL term is normalized by the total response length. The hyperparameter $\alpha$ balances the two loss terms. At the end of this training, we thus obtain our next model $M_{i+1}$ which will be used to generate responses in the next iteration.
+
+Iterative Preference Optimization allows the use of negative examples for feedback, while methods like STaR \autocite{zelikman2022starbootstrappingreasoningreasoning} or ReST \autocite{gulcehre2023reinforcedselftrainingrestlanguage} only use SFT on the generator and only include positive examples. \autocite{wu2024thinkingllmsgeneralinstruction} follow using iterative DPO to train the base model with the reasoning chains, but without the NLL loss. \autocite{wang2024directjudgementpreferenceoptimization} extend this work by employing three approaches to collect the preference pairs for different use cases, afterwards using the same objective in equation \ref{eq:DPO_NLL} to train a better judge model.
+
+\subsubsection{AIPO: Improving Training Objective for Iterative Preference Optimization}
+
+AIPO \autocite{shen2024aipoimprovingtrainingobjective} use a modified version of DPO and SFT:
+
+$$
+    \mathcal{L}_{\text{DPO}}(\pi_\theta; \pi_{\text{ref}}) = -\mathbb{E}_{(x,y_w,y_l) \sim \mathcal{D}} \left[ \log \sigma \left( \beta(s_\theta - s_{\text{ref}}) \right) \right]
+$$
+
+where
+
+$$
+    s_\theta = \log \frac{\pi_\theta (y_w | x)}{\pi_\theta (y_l | x)}, s_{\text{ref}} = \log \frac{\pi_{\text{ref}} (y_w | x)}{\pi_{\text{ref}} (y_l | x)}.
+$$
+
+We note that $s_{\text{ref}}$ represents the extent to which the reference model model tends to generate the chosen response $y_w$ with a higher probability than the rejected response $y_l$, i.e., the agreement between the reference model and the reward model. We introduce an additional coefficient $\alpha$ to $s_{\text{ref}}$:
+
+$$
+    \mathcal{L}_{\alpha\text{-DPO}}(\pi_\theta; \pi_{\text{ref}}) = -\mathbb{E}_{(x,y_w,y_l) \sim \mathcal{D}} \left[ \log \sigma \left( \beta(s_\theta - (1 + \alpha)s_{\text{ref}}) \right) \right]
+$$
+
+where we set $\alpha > 0$. The final loss is then:
+
+$$
+    \mathcal{L}_{\text{AIPO}} = \mathcal{L}_{\alpha\text{-DPO}} + \lambda \cdot \mathcal{L}_{\text{NLL}}
+$$
+where $\mathcal{L}_{\text{NLL}} = -\frac{1}{|y_w|}\log(\pi_\theta(y_w | x))$
+
+\vspace{1em}
+\textbf{Code} available \href{https://github.com/bytedance/AIPO}{here}
+
+
+\subsubsection{Self-Taught Evaluators}
+
+\autocite{wang2024selftaughtevaluators} curate a preference dataset $(x_i, y_i^{w}, y_i^{l})$ and use a seed LLM to generate reasoning traces $c_i$ on ranking the outputs. They then iteratively fine-tune the evaluator LLM on the next iteration of reasoning traces $(x_i, y_i^{w}, y_i^{l},c_i)$, to create a better evaluator.
+
+\vspace{1em}
+\textbf{Code and Data} Code repository available \href{https://github.com/facebookresearch/RAM/tree/self_taught/projects/self_taught_evaluator}{here}, data \href{https://huggingface.co/datasets/facebook/Self-taught-evaluator-DPO-data}{here}, and model weights \href{https://huggingface.co/facebook/Self-taught-evaluator-llama3.1-70B}{here}. The initial prompts were generated from WildChat, and then model generations and LLM-Judge evaluations are by Llama-3-70B. The dataset contains preference pair generations, as well as the correct rationales for preference pairs ranking (the correct ranking is pre-determined). However, since the task was general QA, we have no simple way to evaluate whether our method RDPO works given that we do use this dataset for RDPO. Training was done using Facebook's internal \texttt{fairseq2} library.
+
+\subsubsection{Meta-Rewarding Language Models}
+
+\autocite{wu2024metarewardinglanguagemodelsselfimproving} uses the model to judge its own judgements and uses that feedback to refine its judgment skills.
+
+\subsubsection{Regularized Preference Optimization}
+
+\autocite{liu2024provablymitigatingoveroptimizationrlhf} use a combination of DPO and SFT loss.
+
+\vspace{1em}
+\textbf{Code} Repo available \href{https://github.com/YSLIU627/Regularized-Preference-Optimization}{here}. They use \texttt{OpenRLHF} for training and the \texttt{UltraFeedback} dataset.
+
+\subsection{Using Critique for Reward Modelling}
+
+\subsubsection{Improving Reward Models with Synthetic Critiques}
+
+\autocite{ye2024improvingrewardmodelssynthetic} use externally generated critique of the preference dataset to train them jointly on the reward model. Once we have the critiques $c$ of the preference dataset generated from an external LLM, we augment the training data by enriching them with critiques. We achieve this by concatenating the critiques after each completion to form new preference pairs $(x, y_+ : c_+, y_- : c_-)^2$, which become a critique-augmented training set $\mathcal{D}'$. We train critique RMs on $\mathcal{D}'$ with the loss:
+
+\begin{equation}
+    \mathcal{L}(\theta, \mathcal{D}') = -\mathbb{E}_{(x,y_+,y_-,c)\sim \mathcal{D}'} \log(\sigma(r_\theta(x,y_+ : c_+) - r_\theta(x,y_- : c_-) - m(r)))
+\end{equation}
+
+We implement our RMs by replacing the final projection layer of a pretrained language model with a linear layer that predicts a logit. This is similar to discriminative verifiers.
+
+\subsubsection{Critique-Out-Loud Reward Models}
+
+CLoud reward models \autocite{ankner2024critiqueoutloudrewardmodels} are trained with a dataset of $N$ examples, $D = \{(x, y^-, y^+, c^-, c^+)_i\}^N_{i=1}$, where we introduce oracle critiques, $c^-$, $c^+$, of the rejected and chosen responses $y^-$, $y^+$ respectively. The critiques are reasoning traces that provide feedback on the weaknesses of the responses and strategies for improving them.
+
+To train CLoud reward models we: (1) train the base model and LM head to generate critiques via supervised finetuning on the oracle critiques, (2) replace oracle critiques in the dataset with critiques generated by the finetuned model, and (3) train a reward head conditioned on self-generated critiques. We choose to train the reward head on self-generated critiques as to minimizes the distribution shift in the critiques seen by the reward head between training and inference when oracle critiques are not available.
+
+First, we modify $L_{RM}$ to work with CLoud reward models as:
+
+$$L_{RM}(\theta_B, \theta_R, D) = -\mathbb{E}_{(x,y^-,y^+,c^-,c^+)\sim D}[\log(\sigma(r_{\theta_B,\theta_R}(x, y^+, c^+) - r_{\theta_B,\theta_R}(x, y^-, c^-)))]$$
+
+where the reward estimator $r_\theta(x, y, c)$ is now also conditioned on a critique $c$. Next, we introduce the critique SFT loss, which is the negative log likelihood of the rejected and chosen critiques:
+
+$$L_{SFT}(\theta_B, \theta_{LM}, D) = -\mathbb{E}_{(x,y^-,y^+,c^-,c^+)\sim D}[\sum_{c^-_t \in c^-} \log p(c^-_t|x, y^-, c^-_{<t}; \theta_B, \theta_{LM}) + \sum_{c^+_t \in c^+} \log p(c^+_t|x, y^+, c^+_{<t}; \theta_B, \theta_{LM})]$$
+
+where $c_{<t} = c_1,...,c_{t-1}$ is the prefix of the critique up to the $t^{th}$ token. Finally, we introduce a joint SFT and RM loss as:
+
+$$L_{CLoud}(\theta_B, \theta_{LM}, \theta_R, D) = L_{RM}(\theta_B, \theta_R, D) + \lambda \cdot L_{SFT}(\theta_B, \theta_{LM}, D)$$
+
+where $\lambda$ is a hyperparameter that weights the contribution of the language modeling loss.
+
+To train CLoud reward models we first train $\theta_B, \theta_{LM}$ to generate critiques by minimizing $L_{SFT}$ on the oracle critiques in the oracle dataset $D$ and obtain parameters $\tilde{\theta}_B, \tilde{\theta}_{LM}$. We use the finetuned model to modify our dataset with self-generated critiques that replace the oracle critiques. Finally, we obtain our CLoud reward model parameters by training on our self-critique dataset:
+
+$$\theta^*_B, \theta^*_{LM}, \theta^*_R = \arg\min_{\theta_B,\theta_{LM},\theta_R} L_{CLoud}(\theta_B, \theta_{LM}, \theta_R, D_{self})$$
+
+where $\theta_B, \theta_{LM}$ are initialized to the finetuned parameters $\tilde{\theta}_B, \tilde{\theta}_{LM}$. We train CLoud reward models on the joint loss $L_{CLoud}$ instead of $L_{RM}$ to preserve the critique generation capability of the CLoud reward model and to prevent over-fitting to solely producing reward scores.
+
+\vspace{1em}
+\textbf{Code and Data} Code and data available \href{https://github.com/zankner/CLoud}{here}.
+
+\subsubsection{Self-Generated Critiques Boost Reward Modeling for Language Models}
+
+Recent work \autocite{ye2024improvingrewardmodelssynthetic} directly incorporates critiques generated from off-the-shelf LLMs for reward modeling, while \autocite{ankner2024critiqueoutloudrewardmodels}and \autocite{zhang2024generativeverifiersrewardmodeling} design a joint training approach for learning to generate the critique as well as rewards simultaneously via knowledge distillation. These methods typically rely on a strong teacher LLM to generate high-quality critiques, which can be costly and inefficient to obtain at scale in practice. Moreover, they cannot be used to improve frontier models when a stronger teacher model does not exist.
+
+Critic-RM \autocite{yu2025selfgeneratedcritiquesboostreward}, a framework to allow LLMs to take advantage of self-generated critiques for reward modeling. Critic-RM first generates candidate critiques for each prompt-response pair. Then, a filtering step is conducted to reduce the effect of potentially noisy rationales leading to incorrect predictions, allowing us to augment the preference pairs with additional critiques with the goal of improving the precision of reward modeling. Finally, we implement a joint training scheme to teach the model both high-quality critique generation and accurate reward modeling.
+
+\textbf{Critique-augmented Reward Model Training} We denote $z^+$, $z^-$ as critiques for chosen and rejected responses $y^+$, $y^-$ with prompt $x$, respectively. Then, the overall learning objective $p(y^+ \succ y^- | x)$ can be recast as:
+
+$$\mathcal{L} = \mathbb{E}_{q_\phi(z^+|y^+,x),q_\phi(z^-|y^-,x)} \left[-\log \frac{p(y^+ \succ y^-, z^+, z^- | x)}{q_\phi(z^+ | y^+, x) q_\phi(z^- | y^-, x)}\right]$$
+
+$$= \mathbb{E}_{q_\phi(z^+|y^+,x),q_\phi(z^-|y^-,x)} \left[-\log p(y^+ \succ y^- | z^+, z^-, x)\right] + D_{KL}((q_\phi(z^+ | y^+, x)||p^*(z^+ | y^+, x)) + D_{KL}((q_\phi(z^- | y^-, x)||p^*(z^- | y^-, x))$$
+
+We decompose the reward model training objective into 2 parts:
+
+1) Preference Modeling Loss with Critiques $\ell_r$: the reward model $r_\theta$ learns to predict the reward for each response conditioned on critiques
+
+$$\ell_r(x, y^+, y^-, z^+, z^-) = - \log p(y^+ \succ y^-, z^+, z^- | x) = - \log p(r_\psi(x, [y^+; z^+]) > r_\psi(x, [y^-; z^-]))$$
+
+2) Critique Generation Loss $\ell_c$: the LLM generation $g_\theta$ is trained to generate critiques to approximate the oracle distribution $p^*(· | y, x)$.
+
+$$\ell_c(Z; x, y) = D_{KL}(p^*(z | y_i, x_i)||q_\phi(z | y_i, x_i))$$
+$$= \mathbb{E}_{z\sim p^*(z|y_i,x_i)}[\log p^*(z | y_i, x_i) - \log q_\phi(z | y_i, x_i)]$$
+$$= -\frac{1}{K}\sum_{z\in Z} \log q_\phi(z | y, x) + \text{const.}$$
+
+Then, the overall loss for critique generation can be written as $\ell_c(x, y^+, y^-, Z^+, Z^-) = \ell_c(Z^+; x, y^+) + \ell_c(Z^-; x, y^-)$. We then jointly train the reward model $r_\psi$ and critique generation model $g_\phi$.
+
+\subsubsection{GenRM}
+
+In our \autocite{mahan2024generativerewardmodels} proposed framework we begin with an LLM $\pi_\phi$ acting as a zero-shot judge in an RLAIF setting. That is, given a task $x$ and two responses $y_1$ and $y_2$, we directly prompt the model $\pi_\phi$ to provide an answer indicator token $I$ indicating a preference over the answers. We consider two variants of our approach:
+
+\begin{enumerate}
+    \item The Generative Reward Model (GenRM) approach prompts the model to act as a classifier directly providing the answer token probabilities for each response $\hat{I} \sim \pi_\phi(I|x, y_1, y_2)$.
+    \item The CoT-GenRM approach additionally prompts the model to provide intermediate Chain-of-Thought reasoning $\hat{I}, \hat{r} \sim \pi_\phi(I, r|x, y_1, y_2)$ before providing the final answer indicator token.
+\end{enumerate}
+
+Our prompts are based on the standard MT-Bench prompt. We use the LLM judge as a prior and further train it to align with the ground-truth dataset judgements. We begin with the preference dataset $\mathcal{D} = \{x^{(i)}, y_1^{(i)}, y_2^{(i)}, I^{(i)}\}_{i=1}^N$, however we consider unranked answers $y_1^{(i)}, y_2^{(i)}$ and the corresponding winning choice $I^{(i)}$.
+
+\vspace{1em}
+\textbf{GenRM (no CoT)}
+To train the GenRM model, we use the standard supervised fine tuning objective
+\begin{equation}
+    \mathcal{L}_\text{GenRM}(\pi_\phi) = \mathbb{E}_{(x,y_1,y_2,I)\sim\mathcal{D}}[-\log \pi_\phi(I|x, y_1, y_2)]
+\end{equation}
+essentially using the LLM as a classifier trained with next-token prediction.
+
+\vspace{1em}
+\textbf{CoT-GenRM with Rationalization}
+To train the CoT-GenRM we will also consider two settings—bootstrapping intermediate reasoning from ground-truth or, potentially, a stronger rationalization model $r \sim q_\phi(r|x^{(i)}, y_1^{(i)}, y_2^{(i)})$. We can then train the model with maximum likelihood over both the reasoning chain and ranking:
+\begin{equation}
+    \mathcal{L}_\text{GenRM-Rationalization}(\pi_\phi) = \mathbb{E}_{(x,y_1,y_2,r,I)\sim\mathcal{D}}[-\log \pi_\phi(I|x, y_1, y_2, r) - \log \pi_\phi(r|x, y_1, y_2)]
+\end{equation}
+we refer to this as a post-rationalization approach.
+
+\vspace{1em}
+\textbf{CoT-GenRM-STaR}
+Finally we consider an approach where the model self-bootstraps intermediate reasoning using a STaR approach. We will also consider two loss objectives here—following the filtering strategy described in the above section, we use the standard SFT loss on reasoning chains that yield the correct judgement. We denote models trained with this objective as STaR-SFT. Alternatively, we would like to utilize all the sampled data, including reasoning chains that yield wrong judgments. Similar to the reasoning approach in \autocite{pang2024iterativereasoningpreferenceoptimization} we create a dataset of preference pairs $\mathcal{D} = \{x^{(i)}, y_1^{(i)}, y_2^{(i)}, r_w^{(i)}, I_w^{(i)}, r_l^{(i)}, I_l^{(i)}\}$, where $r_w$ are rationales that lead to correct rankings $I_w$ and $r_l$ are rationales that lead to incorrect rankings $I_l$. We then use a DPO optimization objective of the form:
+\begin{equation}
+    \mathcal{L}_\text{GenRM-DPO}(\pi_\phi) = \mathbb{E}_\mathcal{D}\left[\log\sigma\left(\beta\log\frac{\pi_\phi(I_w, r_w|x, y_1, y_2)}{\pi_\text{ref}(I_w, r_w|x, y_1, y_2)} - \beta\log\frac{\pi_\phi(I_l, r_l|x, y_1, y_2)}{\pi_\text{ref}(I_l, r_l|x, y_1, y_2)}\right)\right]
+\end{equation}
+We denote models trained with this objective as STaR-DPO.
+
+\vspace{1em}
+\textbf{Data} for generation of correct and incorrect answers, as well as verification for both answers, are available \href{https://github.com/gen-agent/genrm-data/tree/main}{here}.
+
+\subsubsection{Generative Judges from Preferences Data}
+
+Similar to prior methods, \autocite{ye2024scalarrewardmodellearning} using an LLM to rank preferences and use the rankings in DPO, and the COT data in SFT.
+
+\subsection{Using Critique for Supervised-Fine-Tuning}
+
+\subsubsection{Critique Fine-Tuning}
+
+\autocite{wang2025critiquefinetuninglearningcritique} CFT involves training the model to critique a given query-response pair, maximizing the likelihood $P(c|[x;y])$, where $c$ is the annotated critique for a query-response pair $[x;y]$. . CFT yields a consistent 4-10\% improvement over SFT on six math benchmarks. Notably, our model Qwen2.5-Math-CFT only requires 1 hour of training on 8xH100 over the 50K examples. It can match or outperform strong competitors like Qwen2.5-Math-Instruct on most benchmarks, which use over 2M samples. Moreover, it can match the performance of SimpleRL, which is a DeepSeek-r1 replication trained with 140x more compute.
+
+\subsection{Using Critique in Step-Level Training}
+
+\autocite{yuan2025agentrtraininglanguagemodel} uses step-level model guided critique and MCTS to iteratively refine the model. \autocite{zhang2024llamaberrypairwiseoptimizationo1like} follow a similar approach. \autocite{xi2024enhancingllmreasoningcritique} create AutoMathCritique — an automated and scalable framework for collecting critique data.
+This framework consists of three main stages: flawed reasoning path construction, critique generation, and data filtering. \autocite{paul2024refinerreasoningfeedbackintermediate} use critique to refine the model's intermediate steps.
+
+%\input{modelsdatasets}
+
+%\input{methods}
+
+\printbibliography
+
+
+\end{document}

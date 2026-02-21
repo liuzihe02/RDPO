@@ -1,0 +1,83 @@
+
+\section{Methods}
+We will introduce a range of very practical and simple to implement ideas towards our goal of leveraging richer preference feedback during fine-tuning.
+
+\subsection{Idea 1: Jointly maximise the rationale }
+
+
+Consider expanding the DPO objective as follows:
+
+\begin{equation}
+    \mathcal{L}_{\theta}(\mathcal{X}_{R}) = - \mathbb{E}_{\mathcal{X}_{R}}
+    \left[ \log \sigma
+    \left(
+    \hat{r}(x, y_{w})
+    - \hat{r}(x, y_{l})
+    \right)
+    + \log p_{\theta}(r | c :y_{w}, y_{l})
+    \right],
+    \label{eq:cdpo_loss}
+\end{equation}
+
+Where $\mathcal{X}_{R}$ is our preference dataset expanded with the reasoning for the given preference judgments: $\mathcal{X}_{R} = \{x, r, y_{w}, y_{l}\}^{N}$ and $c$ are the instructions provided to the oracle for providing the reasoning. $c :y_{w}, y_{l}$ indicates that these instructions are combined with the preference labels as context.
+
+\subsubsection{Experiments}
+
+
+\paragraph{}
+For code, given the simplicity of the change, we should explore
+\url{https://huggingface.co/docs/trl/main/en/dpo_trainer}
+
+\paragraph{}
+We can also reference the Active Preference Learning code:
+\url{https://github.com/willmuldrew/active-preference-learning}
+
+
+
+\subsection{Idea 2: Bayes rule over rationale}
+
+Consider the following formulation of our language model where we explicitly model the rationale:
+
+\begin{equation}
+    p_{\theta}(y_{w} \succ y_{l}, r | x) = p_{\theta}(y_{w} \succ y_{l} | x) p_{\theta}(r | x, y_{w} \succ y_{l} )
+\end{equation}
+
+What about treating it as a latent variable and creating a variational objective?
+
+
+\subsection{Idea 3: Corrections from feedback}
+
+We have a model $p_\theta(r|q)$. Here $q = q_1,\ldots, q_{Q}$ is the query context and we want to generate an output response $r_1,\ldots, r_R$.
+
+In a standard training setup we would maximise the likelihood of context, generation pairs $\sum_n \log p_\theta(r^n|q^n)$.\\
+
+Let's imagine we have though something like a setup whereby a user can provide a response $u$ to the generation, along with a positive/negative reward $y\in\{1,-1\}$.\\
+
+For example,
+\begin{align}
+    q & =\text{what is the capital of France?}  \\
+    r & =\text{London is the capital of France} \\
+    y & =-1                                     \\
+    u & =\text{The capital of France is Paris}
+\end{align}
+In this case we want the model to decrease the probability of $\log p_\theta(r|q)$ but to increase the probability of the correct response $\log p_\theta(u|q)$.  In this case it seems straightforward.  One objective would be to increase  $\log \sigma\left(\log p_\theta(u|q) - \log p_\theta(r|q)\right)$.\\
+
+The above example is straightforward. A more complex situation is when for example:
+\begin{align}
+    q & =\text{Write a four line poem}                               \\
+    r & =\text{Mary had a little lamb; it's feet were white as snow} \\
+    y & =-1                                                          \\
+    u & =\text{That's only a two line poem}
+\end{align}
+In this case we don't have a correct answer for the model. One approach would be to use an LLM to write a correct question-answer pair, based on the user correction. See the image:
+\begin{center}
+
+\end{center}
+In this case GPT learns the correct query-answer pair in both cases. One then wants to decrease the probability of the original response and increase the probability of the correct query-response $q',r'$. One could then add a term like
+\begin{equation}
+    \log \sigma\left(\log p_\theta(r'|q') - \log p_\theta(r|q) \right)
+\end{equation}
+
+One may of course wish to normalise these probabilities by their respective sequence lengths.
+
+I don't know how good GPT is at generating correct query-answer pairs like this, but if it's quite good then this may be a simple way to make use of richer feedback to fine-tune a model.
