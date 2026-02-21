@@ -1,4 +1,4 @@
-\documentclass[11pt,fleqn]{article}
+\documentclass[11pt]{article}
 %\usepackage{palatino,geometry,setspace,hyperref}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
@@ -96,47 +96,77 @@ As large language models (LLMs) become more capable, fine-tuning techniques to a
 
 Asking these oracles to provide reasoning for their binary preferences is common practice. In particular, for LLM-as-a-judge style workflows asking the model to provide reasoning (or so-called chain-of-thought) has been shown to actually improve the model predictions, or verifications in the case of generative verifiers. How can we leverage this rationale when fine-tuning our target model to improve performance in a more data-efficient manner?
 
-\section{Background}
+\section{Background: DPO}
 
-\subsection{DPO}
-For a given prompt $x$, two completions are sampled from the model ($y_{0}, y_{1}) \sim p_{\theta}(y | x)$ and an oracle judges which they prefer. We denote $y_{w}$ as the preferred completion and $y_{l}$ as the other. Typically, the oracle is a human participant; however, the use of LLMs to instead provide feedback has also shown great promise. This process is repeated over $N$ prompts resulting in the pairwise preference dataset $\mathcal{X}_{P} = \{x, y_{w}, y_{l}\}^{N}$
+For a given prompt $x$, two completions are sampled from the policy $(y_{w}, y_{l}) \sim \pi_{\theta}(y | x)$ and an oracle judges which it prefers. We denote $y_{w}$ as the preferred completion and $y_{l}$ as the other. This process is repeated over $N$ prompts resulting in the pairwise preference dataset $\mathcal{D} = \{x^{(i)}, y_{w}^{(i)}, y_{l}^{(i)}\}_{i=1}^{N}$.
 
-During the reward modelling phase in RLHF, the preference data is assumed to follow the Bradley-Terry (BT) model. The objective for training the reward model can be framed as a binary classification task with a cross entropy objective:
+\subsection{Bradley-Terry Preference Model}
+We can model the judge preferences using the Bradley-Terry (BT) model, which expresses the probability that completion $y_1$ is preferred over $y_2$ under a latent reward function $r^*$:
+$$
+    p^*(y_1 \succ y_2 \mid x) = \frac{\exp\left(r^*(x, y_1)\right)}{\exp\left(r^*(x, y_1)\right) + \exp\left(r^*(x, y_2)\right)} = \sigma\!\left(r^*(x, y_1) - r^*(x, y_2)\right)
+$$
+A key property is that BT depends only on the \textit{difference} of rewards, not their absolute values.
+
+\subsection{Standard RLHF}
+
+The standard RLHF pipeline comprises 2 stages. First, we learn a reward model $r_\phi$ where we find the maximum likelihood estimate (MLE) of $\phi$ under our preference dataset $\mathcal{D}$ and BT model - termed reward modelling. Then, we use RL (PPO) to learn an optimal policy $\pi_\theta$ for this learned reward model.
+
+\subsubsection{Reward Modelling}
+Since $r^*$ is unknown, we learn a parametric approximation $r_\phi$. Under the BT model, the likelihood of the observed preference dataset is $\ell(\mathcal{D} \mid \phi) = \prod_{i=1}^{N} \sigma\!\left(r_\phi(x^{(i)}, y_w^{(i)}) - r_\phi(x^{(i)}, y_l^{(i)})\right)$. Taking the log and writing as an expectation, the MLE is obtained by minimising
 \begin{equation}
-    \mathcal{L}_{\phi}(\mathcal{X}_{P})= - \mathbb{E}_{ \mathcal{X}_{P}} [\log \sigma(r_{\phi}(x, y_{w}) - r_{\phi}(x, y_{l}))].
+    \mathcal{L}_{\text{RM}}(\phi) = - \mathbb{E}_{\mathcal{D}} \left[\log \sigma\!\left(r_{\phi}(x, y_{w}) - r_{\phi}(x, y_{l})\right)\right]
     \label{eq:reward-model-objective}
 \end{equation}
-During the subsequent RL fine-tuning phase, the trained reward model is then used to score prompt/completion pairs to provide feedback to the language model. The aim is to maximise the following objective w.r.t $\theta$
+
+\subsubsection{RL Fine-Tuning}
+The learned reward model is then used to fine-tune the policy. The aim is to maximise the KL-constrained objective
 \begin{equation}
-    \mathbb{E}_{x \sim \mathcal{X}, y \sim p_{\theta}(y | x) } [r_{\phi}(x, y)] - \beta \mathrm{KL}(p_{\theta}(y | x) || p_{\theta_{0}}(y | x)).
+    \max_{\pi_\theta} \; \mathbb{E}_{x \sim \mathcal{D},\, y \sim \pi_{\theta}(y | x)} \left[r_{\phi}(x, y)\right] - \beta \, D_{\text{KL}}\!\left(\pi_{\theta}(y | x) \| \pi_{\text{ref}}(y | x)\right)
     \label{eq:ppo-objective}
 \end{equation}
-The second term here regularises the fine-tuned model using the KL-divergence to stay close to the state of the LLM before fine-tuning $p_{\theta_{0}}(y | x)$. The main rationale provided for this is to prevent the model from deviating too far from the distribution on which the reward model is accurate.
+where $\pi_{\text{ref}}$ is the reference policy (typically the SFT model), kept frozen. The KL term prevents the policy from deviating too far from the distribution on which the reward model is accurate, and $\beta > 0$ controls this trade-off. In practice this is optimised with PPO, requiring four models in memory: the policy, reference, reward model, and value function.
 
-In practise the following reward function is used with PPO to update $\theta$.
+\subsection{DPO}
+DPO \autocite{rafailov2024directpreferenceoptimizationlanguage} bypasses the reward modelling and RL steps entirely through a change of variables. The key insight is that there exists a bijection between reward functions and their corresponding optimal policies under the KL-constrained objective \eqref{eq:ppo-objective}, and this bijection can be exploited to reparameterise the preference likelihood directly in terms of the policy. We follow the expositions by \autocite{wolfe2025dpo} and \autocite{romero2024dpo} in our presentation of the derivation below.
 
+\subsubsection{Optimal Policy}
+For \textit{any} reward function $r$ (not just the learned $r_\phi$ or the latent $r^*$), the KL-constrained objective \eqref{eq:ppo-objective} can be rewritten as a minimisation of a KL divergence between $\pi$ and a target distribution defined by $r$, plus a constant. Specifically, letting $Z_r(x) = \sum_y \pi_{\text{ref}}(y|x)\exp\!\left(\frac{1}{\beta}r(x,y)\right)$ be a partition function that depends on $x$ and $r$ but is constant with respect to $\pi$, the objective becomes
+$$
+    \min_{\pi} \; \mathbb{E}_{x} \left[ D_{\text{KL}}\!\left(\pi(y|x) \;\Big\|\; \frac{1}{Z_r(x)}\,\pi_{\text{ref}}(y|x)\,\exp\!\Big(\tfrac{1}{\beta}\,r(x,y)\Big)\right) - \log Z_r(x) \right]
+$$
+By Gibbs' inequality ($D_{\text{KL}} \geq 0$, with equality iff the distributions are identical), the unique optimum is
 \begin{equation}
-    r_{ppo}(x, y) = r_{\phi}(x, y) - \beta(\log p_{\theta}(y|x) - \log p_{\theta_{0}}(y | x)).
+    \pi_r(y|x) = \frac{1}{Z_r(x)}\,\pi_{\text{ref}}(y|x)\,\exp\!\left(\frac{1}{\beta}\,r(x,y)\right)
+    \label{eq:optimal_policy}
 \end{equation}
-DPO is derived from the optimal solution to \eqref{eq:ppo-objective}; providing a maximum likelihood objective analogous to equation \eqref{eq:reward-model-objective}, but parameterised by $\theta$ instead of $\phi$;
+This defines a bijection: every reward $r$ maps to a unique optimal policy $\pi_r$, and conversely every policy $\pi_r$ defines a unique reward\footnote{We really mean unique equivalence class of rewards and its optimal policy; see Lemma 1 and Lemma 2 in \autocite{rafailov2024directpreferenceoptimizationlanguage}.} $r$ for which it is optimal. Using the latent reward $r^*$ gives the optimal policy $\pi^* \equiv \pi_{r^*}$ for our latent rewards.
+
+\subsubsection{Reparameterisation}
+Rearranging \eqref{eq:optimal_policy} for the reward expresses any reward purely in terms of its corresponding optimal policy and a prompt-dependent partition function:
+$$
+    r(x, y) = \beta \log\frac{\pi_r(y|x)}{\pi_{\text{ref}}(y|x)} + \beta \log Z_r(x)
+$$
+Substituting the latent reward $r^*(x,y) = \beta \log\frac{\pi^*(y|x)}{\pi_{\text{ref}}(y|x)} + \beta \log Z_{r^*}(x)$ into the BT model, the $\beta \log Z_{r^*}(x)$ terms cancel because BT depends only on reward \textit{differences} and $Z_{r^*}(x)$ is independent of $y$:
+$$
+    p^*(y_w \succ y_l \mid x) = \sigma\!\left(\beta \log \frac{\pi^*(y_w|x)}{\pi_{\text{ref}}(y_w|x)} - \beta \log \frac{\pi^*(y_l|x)}{\pi_{\text{ref}}(y_l|x)}\right)
+$$
+The preference model now has no dependence on a reward model --- it is expressed entirely in terms of policies.
+
+\subsubsection{DPO Loss}
+We replace the fixed $\pi^*$ with a learnable $\pi_\theta$ and maximise the likelihood of the observed preferences, conditioned on our policy parameters $\theta$. Defining the \textit{implicit reward} $\hat{r}_\theta(x, y) = \beta \log\frac{\pi_\theta(y|x)}{\pi_{\text{ref}}(y|x)}$, the DPO loss is
 \begin{equation}
-    \mathcal{L}_{\theta}(\mathcal{X}_{P}) = - \mathbb{E}_{\mathcal{X}_{P}}
+    \mathcal{L}_{\text{DPO}}(\theta) = - \mathbb{E}_{\mathcal{D}}
     \left[ \log \sigma
         \left(
-        \hat{r}(x, y_{w})
-        - \hat{r}(x, y_{l})
+        \hat{r}_\theta(x, y_{w})
+        - \hat{r}_\theta(x, y_{l})
         \right)
-        \right],
+        \right]
     \label{eq:dpo_loss}
 \end{equation}
-where we have the \textit{implicit reward model}
-\begin{equation}
-    \hat{r}(x, y) = \beta \log\frac{p_\theta(y|x)}{p_{\theta_{0}}(y|x)}.
-    \label{eq:implicit_reward}
-\end{equation}
-This formulation has the distinct advantage of not requiring the explicit reward modeling step and avoids the need to perform any reinforcement learning. Furthermore, it has been shown to outperform RLHF in a range of experiments \autocite{rafailov2024directpreferenceoptimizationlanguage}
+This is identical in form to the reward model loss \eqref{eq:reward-model-objective}, but conditioned on the policy parameters $\theta$ instead of the reward model parameters $\phi$. Traditionally, RLHF performs MLE on $\mathcal{D}$ conditioned on $\phi$ to learn a reward model, then uses RL to find the optimal policy for that reward. DPO instead performs MLE on $\mathcal{D}$ conditioned directly on $\theta$. Because of the reward--policy bijection, improving $\pi_\theta$ to better fit the preference data simultaneously yields an implicit reward $\hat{r}_\theta$ for which $\pi_\theta$ is guaranteed to be optimal. This eliminates both the reward modelling step and the RL step, requiring only two models in memory (the policy $\pi_\theta$ and the frozen reference $\pi_{\text{ref}}$).
 
-In this work we will suggest simple to implement extensions to this objective.
+In this work we suggest simple extensions to this objective.
 
 \section{Literature Review}
 \label{sec:lit}
