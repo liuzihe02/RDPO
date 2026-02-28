@@ -153,7 +153,13 @@ $$
 The preference model now has no dependence on a reward model --- it is expressed entirely in terms of policies.
 
 \subsubsection{DPO Loss}
-We replace the fixed $\pi^*$ with a learnable $\pi_\theta$ and maximise the likelihood of the observed preferences, conditioned on our policy parameters $\theta$. Defining the \textit{implicit reward} $\hat{r}_\theta(x, y) = \beta \log\frac{\pi_\theta(y|x)}{\pi_{\text{ref}}(y|x)}$, the DPO loss is
+We replace the fixed $\pi^*$ with a learnable $\pi_\theta$ and maximise the likelihood of the observed preferences, conditioned on our policy parameters $\theta$. Defining the \textit{implicit reward}
+
+\begin{equation}
+    \hat{r}_\theta(x, y) = \beta \log\frac{\pi_\theta(y|x)}{\pi_{\text{ref}}(y|x)}
+    \label{eq:implicit_reward}
+\end{equation}
+the DPO loss is
 \begin{equation}
     \mathcal{L}_{\text{DPO}}(\theta) = - \mathbb{E}_{\mathcal{D}}
     \left[ \log \sigma
