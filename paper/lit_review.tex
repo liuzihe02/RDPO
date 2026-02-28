@@ -99,7 +99,7 @@ where $y_w$ and $y_l$ are correct and incorrect judge evaluations respectively. 
 \label{sec:gen-verify}
 % ============================================================
 
-The methods above train the policy model. A parallel line of work improves the verifiers and reward models that judge responses, by having them produce reasoning before scoring. These methods establish that critique data is a powerful training signal for judging.
+The methods above train the policy model. A parallel line of work improves the verifiers and reward models that judge responses, by having them produce reasoning before scoring. These methods establish that critique data is a powerful training signal for judging. Generative verifiers aim to provide a scalar verifier score that is used during inference for Best-of-N sampling, whereas critique-augmented reward models produce better reward models for downstream preference tuning etc.
 
 \subsubsection{Generative Verifiers (GenRM)}
 \label{sec:genrm}
@@ -178,34 +178,69 @@ On-policy rationales are essential: using rationales from a strong off-policy mo
 \subsubsection{Critique-out-Loud Reward Models (CLoud)}
 \label{sec:cloud}
 
-\autocite{ankner2024critiqueoutloudrewardmodels} train reward models that generate a natural-language critique $c$ before predicting a scalar reward $r_{\theta_R}(x, y, c)$, via a three-stage pipeline. First, the base model is SFT'd on oracle critiques (from Llama-3.1-405B). Second, oracle critiques are \emph{replaced} with self-generated ones to form $\mathcal{D}_{\text{self}}$. Third, the model is trained on the joint loss:
+\autocite{ankner2024critiqueoutloudrewardmodels} train reward models that generate a natural-language critique $c$ before predicting a scalar reward. The model has 2 parameter groups built on top of a shared base $\theta_B$: $\theta_{LM}$: the pretrained LM head, which generates critique tokens autoregressively, and $\theta_R$: a randomly initialised shallow MLP reward head, which reads the final hidden state of the full sequence and outputs a scalar reward. Scoring at inference is therefore a two-step procedure: (1) \emph{generate} a critique by feeding $(x, y)$ through $\theta_B + \theta_{LM}$ to autoregressively sample $c$; then (2) \emph{score} by feeding the full sequence $(x, y, c)$ through $\theta_B + \theta_R$ to obtain the scalar $r_{\theta_R}(x, y, c)$. The training pipeline is as follows:
+
+\textbf{Stage 1 --- SFT on oracle critiques} External oracle critiques are generated offline by Llama-3.1-405B for every chosen and rejected response. $\theta_B ,\theta_{LM}$ is fine-tuned on these via NLL; ($\theta_R$ does not yet exist):
 \begin{equation}
-    \mathcal{L}_{\text{CLoud}} = \underbrace{-\mathbb{E}\!\left[\log\sigma\!\left(r_{\theta_R}(x, y_w, c_w) - r_{\theta_R}(x, y_l, c_l)\right)\right]}_{\text{reward modelling}} + \lambda \underbrace{\mathcal{L}_{\text{SFT}}(\theta_B, \theta_{LM},\, \mathcal{D})}_{\text{critique generation}}
+    \mathcal{L}_{\text{SFT}}(\theta_B, \theta_{LM}) = -\mathbb{E}\!\left[\sum_t \log p(c_t^- \mid x, y^-, c_{<t}^-) + \sum_t \log p(c_t^+ \mid x, y^+, c_{<t}^+)\right]
+    \label{eq:cloud_sft}
+\end{equation}
+
+\textbf{Stage 2 --- Self-generated Critique} Using the Stage~1 model, new critiques are sampled for every training example: $\hat{c}^{\pm} \sim p(\cdot \mid x, y^{\pm};\,\tilde\theta_B, \tilde\theta_{LM})$. These replace the oracle critiques to form $\mathcal{D}_{\text{self}}$. At inference $\theta_R$ will see self-generated critiques, so we need to produce good self-generated critiques to reduce distributional shift.
+
+\textbf{Stage 3 --- Joint training on $\mathcal{D}_{\text{self}}$.} $\theta_R$ is randomly initialised on top of $\theta_B$ . All three parameter groups are jointly optimised on $\mathcal{D}_{\text{self}}$:
+\begin{equation}
+    \mathcal{L}_{\text{CLoud}} = \underbrace{-\mathbb{E}\!\left[\log\sigma\!\left(r_{\theta_R}(x, y^+, \hat{c}^+) - r_{\theta_R}(x, y^-, \hat{c}^-)\right)\right]}_{\mathcal{L}_{\text{RM}}\text{: trains }\theta_R\text{ and }\theta_B} \;+\; \lambda\,\underbrace{\mathcal{L}_{\text{SFT}}(\theta_B, \theta_{LM}, \mathcal{D}_{\text{self}})}_{\text{trains }\theta_{LM}\text{ and }\theta_B}
     \label{eq:cloud}
 \end{equation}
-\textbf{Key insight: on-policy vs.\ off-policy critiques.} Training the reward head on oracle (off-policy) critiques causes a 5.6 percentage point drop in RewardBench accuracy for the 8B model compared to self-generated (on-policy) critiques, due to distribution shift between training and inference. This observation has direct implications for Method~1: the base model's NLL target $c_v$ should ideally be drawn from a distribution the model can learn to approximate at inference.
+$\mathcal{L}_{\text{RM}}$ sends gradients into $\theta_R$ via the classic Bradley-Terry preference modelling loss; $\mathcal{L}_{\text{SFT}}$ sends gradients into $\theta_{LM}$. The $\mathcal{L}_{\text{SFT}}$ term in Stage~3 is important --- without it, $\theta_{LM}$ receives no gradient and critique quality degrades, which then corrupts the conditioning signal seen by $\theta_R$.
 
-CLoud-8B improves pairwise classification accuracy by 4.65 points over classic reward models and achieves Pareto-dominant Best-of-N win rates on ArenaHard.
+At inference, $N$ critiques are sampled and the resulting scalar rewards averaged:
+\begin{equation}
+    \bar{R}(x, y) = \frac{1}{N}\sum_{i=1}^{N} r_{\theta_R}\!\left(x, y, c_i\right), \qquad c_i \sim p(\cdot \mid x, y;\,\theta_B, \theta_{LM})
+    \label{eq:cloud_sc}
+\end{equation}
+
+On-policy critiques are essential: training the reward head on oracle (off-policy) critiques causes a 5.6\% drop in RewardBench accuracy for the 8B model (3.0~pp for 70B) relative to self-generated (on-policy) training. The reward head learns to condition on the statistical properties of the critique distribution it saw during training; oracle critiques are systematically longer and more detailed than self-generated ones, so the reward head cannot properly calibrate from a distribution shift critique at inference. CLoud-8B improves pairwise RewardBench accuracy by 4.65\% over a classic RM and is Pareto-dominant across all $N \in [2,16]$ on ArenaHard Best-of-N win rate. The 8B CLoud model outperforms the 70B classic RM on Chat and Safety categories.
 
 \subsubsection{Critic-RM: Critiques as Latent Variables}
 \label{sec:critic-rm}
 
-\autocite{yu2025selfgeneratedcritiquesboostreward} provide an elegant variational formulation that treats critiques as latent variables. Denoting $z_w, z_l$ as critiques for chosen and rejected responses, the preference likelihood is marginalised:
+\autocite{yu2025selfgeneratedcritiquesboostreward} provide a principled variational formulation that unifies critique generation and reward modeling, requiring no teacher LLM --- critiques are self-generated and quality-filtered.
+
+The model is built on a shared backbone $M_\theta$ with two heads: $q_\phi = h_g \circ M_\theta$ (the pretrained LM head, generates critique text) and $r_\psi = h_r \circ M_\theta$ (a randomly initialised scalar head, predicts reward). $q_\phi$ plays a dual role: it is simultaneously the \emph{approximate posterior} over the latent critiques $z$ (pushed toward the oracle $p^*$ by $\ell_c$) and the generator of critique samples that $r_\psi$ conditions on in $\ell_r$.
+
+Introducing critiques for chosen and rejected responses $z^+, z^-$ as latents and marginalising:
+$$p(y^+ \succ y^- \mid x) = \sum_{z^+, z^-} p(y^+ \succ y^- \mid z^+, z^-, x)\, p^*(z^+ \mid y^+, x)\, p^*(z^- \mid y^-, x)$$
+Since $p^*$ is intractable, substitute the learned $q_\phi$ and apply Jensen's inequality to obtain the ELBO:
 \begin{equation}
-    \log p(y_w \!\succ\! y_l \mid x) \;\geq\; \mathbb{E}_{q_\phi(z_w | y_w, x),\, q_\phi(z_l | y_l, x)}\!\left[\log \frac{p(y_w \!\succ\! y_l,\, z_w, z_l \mid x)}{q_\phi(z_w | y_w, x)\, q_\phi(z_l | y_l, x)}\right]
+    \log p(y^+ \succ y^- \mid x) \;\geq\; \mathbb{E}_{q_\phi(z^+|y^+,x),\,q_\phi(z^-|y^-,x)}\!\left[\log \frac{p(y^+ \succ y^-,\, z^+, z^- \mid x)}{q_\phi(z^+|y^+,x)\,q_\phi(z^-|y^-,x)}\right]
     \label{eq:critic_rm}
 \end{equation}
-This variational lower bound decomposes into two objectives trained jointly: (1) a \textbf{preference modeling loss} $\ell_r = -\log \sigma(r_\psi(x, [y_w; z_w]) - r_\psi(x, [y_l; z_l]))$, where $[y; z]$ concatenates response and critique; and (2) a \textbf{critique generation loss} $\ell_c = -\frac{1}{K}\sum_{z \in Z} \log q_\phi(z \mid y, x)$, which trains the critique model to approximate the oracle distribution. A dynamic weight schedule $\lambda(t)$ emphasises critique generation in early epochs and gradually shifts to reward prediction.
+Maximising this ELBO decomposes into two objectives. The \textbf{critique generation loss} $\ell_c$ trains $q_\phi$ to approximate $p^*$. Reverse KL would cause entropy collapse, so \emph{forward} KL is used, treating the filtered critique set $Z$ as a uniform proxy for $p^*$:
+\begin{equation}
+    \ell_c = -\frac{1}{|Z|}\sum_{z \in Z} \log q_\phi(z \mid y, x)
+    \label{eq:critic_rm_c}
+\end{equation}
+The \textbf{preference modeling loss} $\ell_r$ trains $r_\psi$: the critique $z$ is appended to the response, and the scalar head pools from the concatenation $[y; z]$:
+\begin{equation}
+    \ell_r = -\log\sigma\!\left(r_\psi(x, [y^+; z^+]) - r_\psi(x, [y^-; z^-])\right)
+    \label{eq:critic_rm_r}
+\end{equation}
 
-Critic-RM improves reward modeling accuracy by 3.7--7.3\% on RewardBench. The 70B variant outperforms both GPT-4 and Llama-3.1-405B on critique quality, and matches full-data performance with only 10\% of training data.
+\textbf{Dynamic weighting schedule.} The two losses are combined with a time-varying weight $\lambda(t)$:
+\begin{equation}
+    \mathcal{L}(\phi, \psi) = \lambda(t)\cdot\ell_c + \bigl(1-\lambda(t)\bigr)\cdot\ell_r, \qquad
+    \lambda(t) = \begin{cases} 1 & t < (K-1)T \\ 1 - \beta\cdot\dfrac{t-(K-1)T}{T} & t \geq (K-1)T \end{cases}
+    \label{eq:critic_rm_schedule}
+\end{equation}
+With $K=2$ epochs and $\beta=0.9$: the first epoch trains \emph{only} on critique generation ($\lambda=1$, reward head receives no gradient); in the final epoch $\lambda$ decays from $1$ to $0.1$, gradually shifting supervision to reward prediction. This ordering is essential --- the reward head only begins training once the LM already has strong critique capability, preventing reward-head overfitting before useful critiques can be generated. At inference, $m$ critiques are sampled and scalar rewards averaged: $\bar{r} = \frac{1}{m}\sum_{i=1}^m r_\psi(x, [y, z_i])$.
 
 % ============================================================
 \subsection{Training the Base Model with Critique}
 \label{sec:base-critique}
 % ============================================================
-
-Recall the three defining features of Method~1: \textbf{(A)} a DPO loss on answer preferences $(y_w, y_l)$; \textbf{(B)} an NLL term on the oracle/verifier's CoT critique $c_v$; and \textbf{(C)} applied to the base policy model. No single prior paper combines all three; the methods below each match two of the three.
-
+The methods in Section~\ref{sec:gen-verify} improve reward models and judges by having them generate critique. A closely related cluster instead trains the base \emph{policy} model directly using critique signals. This section covers the methods most directly related to Method~1.
 % ============================================================
 \subsubsection{Critique Fine-Tuning}
 % ============================================================
@@ -216,8 +251,6 @@ Recall the three defining features of Method~1: \textbf{(A)} a DPO loss on answe
     \label{eq:cft}
 \end{equation}
 where $[x;\, y]$ concatenates the query and a (potentially flawed) response, and $c_v$ is a critique generated by a teacher model (GPT-4o). At inference, the CFT-trained model generates direct answers without producing critiques.
-
-The methods in Section~\ref{sec:gen-verify} improve reward models and judges by having them generate critique. A closely related cluster instead trains the base \emph{policy} model directly using critique signals. This section covers the methods most directly related to Method~1.
 
 \subsubsection{SuperCorrect: Cross-Model Collaborative DPO}
 
