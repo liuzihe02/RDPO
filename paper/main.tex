@@ -475,7 +475,7 @@ SFT methods provide modest, stable improvements over the baseline, while both pr
 \subsection{Training Dynamics}
 \label{sec:dynamics}
 
-Figure~\ref{fig:eval_curves} shows evaluation accuracy across training checkpoints. The SFT variants maintain stable accuracy throughout training, with SFT (no verification) reaching 51.8\% on GSM8K --- a modest 2.2 percentage point improvement over the 49.6\% baseline. Both DPO and CDPO begin at the baseline accuracy (checkpoint 0 is the unmodified model) and collapse rapidly: DPO drops to ${\sim}$6\% within the first 400 training steps, while CDPO collapses even faster to ${\sim}$1\% by step 600.
+Figure~\ref{fig:eval_curves} shows evaluation accuracy across training checkpoints. The SFT variants maintain stable accuracy throughout training, with SFT (no verification) reaching 51.8\% on GSM8K --- a modest 2.2 percentage point improvement over the 49.6\% baseline. Both DPO and CDPO begin at the baseline accuracy (checkpoint 0 is the unmodified model) and collapse rapidly: DPO drops to ${\sim}$6\% within the first 0.3 epochs, while CDPO collapses even more to ${\sim}$1\% by 0.5 epochs.
 
 \begin{figure}[H]
     \centering

@@ -83,12 +83,12 @@ def plot_evaluate_results(validation_dir):
             results.sort()
             if results:
                 checkpoints, accuracies = zip(*results)
-                # Normalize to training progress (save_steps=0.1, so each checkpoint is 10%)
+                # Normalize to epochs (2 epochs total, save_steps=0.1 means every 0.2 epochs)
                 max_ckpt = max(checkpoints)
-                progress = [c / max_ckpt * 100 for c in checkpoints]
-                plt.plot(progress, accuracies, marker="o", label=DISPLAY_NAMES.get(model_name, model_name))
+                epochs = [c / max_ckpt * 2.0 for c in checkpoints]
+                plt.plot(epochs, accuracies, marker="o", label=DISPLAY_NAMES.get(model_name, model_name))
 
-        plt.xlabel("Training Progress (%)")
+        plt.xlabel("Epoch")
         plt.ylabel("Accuracy (%)")
         plt.title(f"{dataset_name} Validation Accuracy by Checkpoint")
         plt.grid(True)
