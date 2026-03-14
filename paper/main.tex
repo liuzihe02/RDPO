@@ -86,15 +86,17 @@
 \maketitle
 
 \begin{abstract}
-    This is \textit{very much} a work-in-progress document, which reviews how generative verifiers can be implemented and simple experimental results. Much of this current version are disjointed concepts and messy; my current task is to tidy these reviews up and include the experimental results.
+    Direct Preference Optimization (DPO) enables fine-tuning language models from pairwise preferences without reinforcement learning, while using binary preference labels, discarding the reasoning behind the oracle's judgement. We propose Critique DPO (CDPO), which augments the DPO loss with an additional negative log-likelihood term on the verifier's chain-of-thought critique, training the base policy to reproduce the step-by-step reasoning that justifies the preference. We evaluate CDPO against DPO and SFT baselines on Qwen2.5-0.5B-Instruct using 120{,}000 math preference triples from the GenRM dataset. Our results are a negative finding: both DPO and CDPO suffer performance collapse on GSM8K and MATH-500, with CDPO collapsing faster and more severely than vanilla DPO. We analyse this failure through the lens of reward hacking, distributional mismatch, and discuss implications for when and how verifier critique can be incorporated into base policy training.
 \end{abstract}
 
 
 \section{Introduction}
 
-As large language models (LLMs) become more capable, fine-tuning techniques to align with human intent are increasingly important. A key consideration for aligning these models is how to most effectively use human resources, or model resources in the case where LLMs themselves are used as oracles. Reinforcement learning from Human or AI preferences (RLHF/RLAIF) is the most prominent example of such a technique but is complex and often unstable. Direct Preference Optimization (DPO) has recently been proposed as a simpler and more stable alternative. In this note, we explore how to expand the DPO objective to make better use of feedback data from the human or AI oracles. Specifically, we incorporate the Chain-Of-Thought reasoning of a generative verifier (acting to verify and critique the validity of base models) in the DPO loss term for the base model.
+As large language models (LLMs) become more capable, fine-tuning techniques to align with human intent are increasingly important. A key consideration for aligning these models is how to most effectively use human resources, or model resources in the case where LLMs themselves are used as oracles. Reinforcement learning from Human or AI preferences (RLHF/RLAIF) is the most prominent example of such a technique but is complex and often unstable. Direct Preference Optimization (DPO) \autocite{rafailov2024directpreferenceoptimizationlanguage} has recently been proposed as a simpler and more stable alternative, bypassing the reward modelling and RL steps entirely. However, DPO reduces the oracle's judgement to a single binary label --- preferred or rejected --- discarding any reasoning the oracle provides for its preference, using only the COT of the base model for DPO training.
 
-Asking these oracles to provide reasoning for their binary preferences is common practice. In particular, for LLM-as-a-judge style workflows asking the model to provide reasoning (or so-called chain-of-thought) has been shown to actually improve the model predictions, or verifications in the case of generative verifiers. How can we leverage this rationale when fine-tuning our target model to improve performance in a more data-efficient manner?
+Asking these oracles to provide reasoning for their binary preferences is common practice. In particular, for LLM-as-a-judge style workflows, asking the model to provide chain-of-thought reasoning has been shown to improve the quality of the judgements themselves. This raises a natural question: can we leverage the oracle's reasoning --- not just its binary label --- when fine-tuning the target model?
+
+In this work, we propose Critique DPO (CDPO), which augments the DPO objective with a negative log-likelihood term on the verifier's chain-of-thought critique, training the base policy to reproduce the step-by-step verification reasoning alongside learning from pairwise preferences. We evaluate CDPO on mathematical reasoning using Qwen2.5-0.5B-Instruct and the GenRM dataset. Our results are a negative finding: CDPO collapses faster and more severely than vanilla DPO, which itself suffers catastrophic performance degradation at this smaller scale. We analyse this failure and discuss implications for the design of critique-augmented training methods.
 
 \section{Background: DPO}
 
@@ -440,7 +442,7 @@ With $K=2$ epochs and $\beta=0.9$: the first epoch trains \emph{only} on critiqu
 \subsection{Training the Base Model with Critique}
 \label{sec:base-critique}
 % ============================================================
-The methods in Section~\ref{sec:gen-verify} improve reward models and judges by having them generate critique. A closely related cluster instead trains the base \emph{policy} model directly using critique signals. This section covers the methods most directly related to Method~1.
+The methods in Section~\ref{sec:gen-verify} improve reward models and judges by having them generate critique. A closely related cluster instead trains the base \emph{policy} model directly using critique signals. This section covers the methods most directly related to CDPO.
 % ============================================================
 \subsubsection{Critique Fine-Tuning}
 % ============================================================
@@ -459,14 +461,14 @@ where $[x;\, y]$ concatenates the query and a (potentially flawed) response, and
     \mathcal{L}_{\text{Cross-DPO}} = -\mathbb{E}\!\left[\log\sigma\!\left(\beta\log\frac{\pi_\theta(a_k^+, c_k^+ \mid x, s_{<k})}{\pi_{\text{ref}}(a_k^+, c_k^+ \mid x, s_{<k})} - \beta\log\frac{\pi_\theta(a_k^-, c_k^- \mid x, s_{<k})}{\pi_{\text{ref}}(a_k^-, c_k^- \mid x, s_{<k})}\right)\right]
     \label{eq:supercorrect}
 \end{equation}
-where $s_{<k}$ are the correct preceding steps. The teacher's correction trace plays the role of $c_v$ in Method~1. SuperCorrect-7B achieves 70.2\% on MATH (surpassing DeepSeekMath-7B by 7.8\%) and demonstrates that cross-model DPO at the step level substantially improves self-correction capabilities. CriticGPT \autocite{mcaleese2024llmcriticshelpllm} and CTRL \autocite{xie2025teachinglanguagemodelscritique} provide complementary evidence that LLMs can be explicitly taught to generate high-quality critiques.
+where $s_{<k}$ are the correct preceding steps. The teacher's correction trace plays the role of $c_v$ in CDPO. SuperCorrect-7B achieves 70.2\% on MATH (surpassing DeepSeekMath-7B by 7.8\%) and demonstrates that cross-model DPO at the step level substantially improves self-correction capabilities. CriticGPT \autocite{mcaleese2024llmcriticshelpllm} and CTRL \autocite{xie2025teachinglanguagemodelscritique} provide complementary evidence that LLMs can be explicitly taught to generate high-quality critiques.
 
 % ============================================================
-\subsection{Positioning of Method~1}
+\subsection{Positioning of CDPO}
 \label{sec:positioning}
 % ============================================================
 
-The three defining features of Method~1 are: \textbf{(A)} a DPO loss on answer preferences $(y_w, y_l)$; \textbf{(B)} an NLL term on the verifier's CoT critique $c_v$; and \textbf{(C)} applied to the base policy model. No single prior work combines all three.
+The three defining features of CDPO are: \textbf{(A)} a DPO loss on answer preferences $(y_w, y_l)$; \textbf{(B)} an NLL term on the verifier's CoT critique $c_v$; and \textbf{(C)} applied to the base policy model. No single prior work combines all three.
 
 \begin{center}
     \small
@@ -474,7 +476,7 @@ The three defining features of Method~1 are: \textbf{(A)} a DPO loss on answer p
         \hline
         \textbf{Paper}                                                                                             & \textbf{A: DPO on answers} & \textbf{B: NLL on verifier CoT} & \textbf{C: Base model} \\
         \hline
-        \textbf{Method~1 (this work)}                                                                              & \checkmark                 & \checkmark                      & \checkmark             \\
+        \textbf{CDPO (this work)}                                                                                  & \checkmark                 & \checkmark                      & \checkmark             \\
         IRPO \autocite{pang2024iterativereasoningpreferenceoptimization}                                           & \checkmark                 & NLL on own CoT                  & \checkmark             \\
         AIPO / RPO \autocite{shen2024aipoimprovingtrainingobjective,liu2024provablymitigatingoveroptimizationrlhf} & \checkmark                 & NLL on $y_w$                    & \checkmark             \\
         DJPO \autocite{wang2024directjudgementpreferenceoptimization}                                              & \checkmark                 & \checkmark                      & $\times$ (judge)       \\
@@ -485,7 +487,481 @@ The three defining features of Method~1 are: \textbf{(A)} a DPO loss on answer p
     \end{tabular}
 \end{center}
 
-Method~1 sits at the intersection of three lines of work that have so far only been combined in pairs: (1) IRPO establishes the right loss structure (DPO + NLL) but anchors to the model's own CoT rather than an external verifier's critique; (2) DJPO and GenRM-STaR-DPO use verifier reasoning as the NLL target --- the right data --- but apply it to train a standalone judge rather than the answer-generating base policy; and (3) CFT applies verifier critique as a direct NLL target for the base policy --- the right model and signal --- but omits the DPO preference term entirely.
+CDPO sits at the intersection of three lines of work that have so far only been combined in pairs: (1) IRPO establishes the right loss structure (DPO + NLL) but anchors to the model's own CoT rather than an external verifier's critique; (2) DJPO and GenRM-STaR-DPO use verifier reasoning as the NLL target --- the right data --- but apply it to train a standalone judge rather than the answer-generating base policy; and (3) CFT applies verifier critique as a direct NLL target for the base policy --- the right model and signal --- but omits the DPO preference term entirely.
+
+\section{Methodology}
+
+We now describe the Critique DPO (CDPO) objective, and the dataset construction, and specify the baseline methods against which CDPO is compared.
+
+\subsection{Data Construction}
+\label{sec:data}
+
+We use the GenRM dataset \autocite{zhang2024generativeverifiersrewardmodeling}, which provides math problems from the GSM8K \autocite{cobbe2021training} training set. For each problem $x$, multiple candidate solutions are generated by Gemini 1.0 Pro. Each candidate solution is labelled correct or incorrect by checking the extracted final answer against the ground-truth answer. An LLM oracle generates a step-by-step verification rationale \textit{for each individual solution}, verifying each reasoning step against the expected answer and concluding with a ``Yes'' (correct) or ``No'' (incorrect) judgement. We denote the verification rationale for a correct solution as $c_{v,w}$ and for an incorrect solution as $c_{v,l}$.
+
+From this raw data, we construct preference triples $(x, y_w, y_l, c_v)$ by pairing, for each problem, a correct solution $y_w$ with an incorrect solution $y_l$. The critique sequence $c_v$ is then assembled by concatenating \textit{both} solutions together with their respective verification rationales into a single contrastive narrative:
+\begin{quote}
+    \small
+    $c_v$ = ``\texttt{This is a correct solution and preferred:}'' + $y_w$ + ``\texttt{Here's why this solution is correct and preferred:}'' + $c_{v,w}$ + ``\texttt{This is an incorrect solution and not preferred:}'' + $y_l$ ``\texttt{Here's why this solution is incorrect and not preferred:}'' + $c_{v,l}$
+\end{quote}
+We then derive four training-set variants:
+\begin{itemize}
+    \item \textbf{CDPO}: each sample is $(x,\, y_w,\, y_l,\, c_v)$ --- a preference pair with the composite critique.
+    \item \textbf{DPO}: each sample is $(x,\, y_w,\, y_l)$ --- the same preference pairs, without any verification reasoning.
+    \item \textbf{SFT (no verification)}: each sample is $(x,\, y_w)$ --- supervised fine-tuning on correct solutions only.
+    \item \textbf{SFT (with verification)}: each sample is $(x,\, y_w, \, c_{v,w})$ --- supervised fine-tuning on the correct solution concatenated with its individual verification rationale $c_{v,w}$
+\end{itemize}
+
+\subsection{CDPO: Critique Direct Preference Optimization}
+\label{sec:cdpo}
+
+CDPO augments the standard DPO loss with an auxiliary negative log-likelihood (NLL) term that trains the base policy to reproduce the verifier's chain-of-thought critique. The combined loss is
+\begin{equation}
+    \mathcal{L}_{\text{CDPO}}(\theta) = (1 - \alpha)\,\mathcal{L}_{\text{DPO}}(\theta) \;+\; \alpha\,\mathcal{L}_{\text{critique}}(\theta)
+    \label{eq:cdpo_loss}
+\end{equation}
+where $\alpha \in [0, 1]$ controls the trade-off between the preference signal and the critique signal. The DPO term $\mathcal{L}_{\text{DPO}}$ is the standard loss from Eq.~\eqref{eq:dpo_loss}. The critique term is the length-normalised NLL on the verifier's chain-of-thought:
+\begin{equation}
+    \mathcal{L}_{\text{critique}}(\theta) = -\frac{1}{|c_v|}\sum_{t=1}^{|c_v|} \log \pi_\theta(c_{v,t} \mid c_{v,<t},\, x)
+    \label{eq:cdpo_nll}
+\end{equation}
+
+The composite critique $c_v$ is a contrastive narrative: it restates both the preferred and less preferred solutions, then provides step-by-step verification rationales that trace where each solution's reasoning succeeds or fails. Concretely, the model receives the input sequence $[x;\, c_v]$ --- the problem followed by the critique --- and the NLL loss is computed only over the $c_v$ tokens. Because $c_v$ embeds both solutions $y_w$ and $y_l$ within its narrative, it is self-contained: the model learns to generate the full contrastive analysis given only the problem statement. By training the base policy to reproduce this analysis, we hypothesise that the model will learn to distinguish correct from incorrect reasoning steps, thereby improving its own solution quality.
+
+CDPO instantiates the generic DPO+NLL template of Eq.~\eqref{eq:dpo_nll_template} with the NLL target set to the external verifier's critique $c_v$, rather than the model's own chain-of-thought (as in IRPO; Section~\ref{sec:irpo}) or the winning response $y_w$ (as in AIPO/RPO; Sections~\ref{sec:aipo},~\ref{sec:rpo}). Unlike DJPO and GenRM-STaR-DPO (Sections~\ref{sec:djpo},~\ref{sec:genrm-star}), which also use verifier reasoning as the NLL target but train a standalone judge, CDPO applies the critique signal directly to the answer-generating base policy.
+
+\subsection{Baseline Methods}
+\label{sec:baselines}
+
+We compare CDPO against three baselines, all trained on the same underlying data:
+
+\textbf{DPO.} The standard DPO loss (Eq.~\ref{eq:dpo_loss}), equivalent to setting $\alpha = 0$ in Eq.~\eqref{eq:cdpo_loss}. This isolates the contribution of the critique term.
+
+\textbf{SFT (no verification).} Standard supervised fine-tuning on correct solutions:
+\begin{equation}
+    \mathcal{L}_{\text{SFT}}(\theta) = -\sum_{t=1}^{|y_w|} \log \pi_\theta(y_{w,t} \mid y_{w,<t},\, x)
+    \label{eq:sft_baseline}
+\end{equation}
+This establishes a lower bound: what can be achieved without any preference signal.
+
+\textbf{SFT (with verification).} The same SFT objective, but the training target is the concatenation $[y_w + c_v]$ --- the correct solution followed by the verification rationale. This tests whether the verification data is useful as a pure SFT signal, without the DPO preference term.
+
+
+% ============================================================
+\section{Experimental Setup}
+\label{sec:experiments}
+% ============================================================
+
+\subsection{Training Configuration}
+
+We use Qwen2.5-0.5B-Instruct \autocite{qwen2024qwen25} as the base model. All four methods share the same base configuration: LoRA with rank 8 applied to all linear modules, learning rate $1 \times 10^{-6}$ with cosine decay and 10\% warmup, 2 training epochs, bf16 mixed precision, FlashAttention-2, and DeepSpeed ZeRO Stage~3 across 8 NVIDIA H100 80GB GPUs. Method-specific settings are summarised in Table~\ref{tab:hparams}.
+
+\begin{table}[H]
+    \centering
+    \small
+    \caption{Method-specific hyperparameters. All other settings (LoRA rank, learning rate, scheduler, epochs, precision) are shared across methods.}
+    \label{tab:hparams}
+    \begin{tabular}{lcccc}
+        \hline
+                                   & \textbf{CDPO} & \textbf{DPO} & \textbf{SFT-veri} & \textbf{SFT-no\_veri} \\
+        \hline
+        Batch size / GPU           & 6             & 16           & 32                & 48                    \\
+        $\beta$                    & 0.1           & 0.1          & ---               & ---                   \\
+        $\alpha$ (critique weight) & 0.5           & ---          & ---               & ---                   \\
+        Length-normalised critique & Yes           & ---          & ---               & ---                   \\
+        Gradient checkpointing     & Yes           & No           & Yes               & Yes                   \\
+        \hline
+    \end{tabular}
+\end{table}
+
+The batch sizes differ across methods because CDPO processes three sequences per example (chosen, rejected, critique), requiring significantly more memory than the other methods.
+
+\subsection{Evaluation}
+
+We evaluate on two mathematical reasoning benchmarks: GSM8K \autocite{cobbe2021training} (500 test samples) and MATH-500 \autocite{hendrycks2021measuring}. All evaluations use greedy decoding (temperature 0, top-$p$ = 1) via vLLM for efficient inference. LoRA adapters are merged with the base model before evaluation. We evaluate checkpoints saved at every 10\% of training (yielding 10--14 checkpoints per method), reporting both the best checkpoint accuracy and the final checkpoint accuracy to capture training dynamics.
+
+% ============================================================
+\section{Results}
+\label{sec:results}
+% ============================================================
+
+\subsection{Main Results}
+
+Table~\ref{tab:main_results} summarises the best and final checkpoint accuracy for each method. The baseline row shows the pre-training accuracy of the unmodified Qwen2.5-0.5B-Instruct model (checkpoint 0, shared across all methods).
+
+\begin{table}[H]
+    \centering
+    \caption{Test accuracy (\%) on GSM8K and MATH-500. \textit{Best} reports the highest accuracy across all checkpoints; \textit{Final} reports the last checkpoint. The baseline is the unmodified Qwen2.5-0.5B-Instruct model.}
+    \label{tab:main_results}
+    \begin{tabular}{lcccc}
+        \hline
+                                & \multicolumn{2}{c}{\textbf{GSM8K}} & \multicolumn{2}{c}{\textbf{MATH-500}}                         \\
+        \textbf{Method}         & Best                               & Final                                 & Best          & Final \\
+        \hline
+        Baseline (ckpt-0)       & 49.6                               & ---                                   & 34.4          & ---   \\
+        SFT (no verification)   & \textbf{51.8}                      & 51.4                                  & \textbf{35.4} & 32.6  \\
+        SFT (with verification) & 50.8                               & 50.8                                  & 35.2          & 33.0  \\
+        DPO                     & 49.6                               & 4.8                                   & 34.4          & 3.2   \\
+        CDPO ($\alpha\!=\!0.5$) & 49.6                               & 0.6                                   & 34.4          & 0.8   \\
+        \hline
+    \end{tabular}
+\end{table}
+
+SFT methods provide modest, stable improvements over the baseline, while both preference-based methods (DPO and CDPO) suffer catastrophic performance collapse. Critically, CDPO --- the method designed to leverage richer feedback --- performs \textit{worse} than vanilla DPO.
+
+\subsection{Training Dynamics}
+\label{sec:dynamics}
+
+Figure~\ref{fig:eval_curves} shows evaluation accuracy across training checkpoints. The SFT variants maintain stable accuracy throughout training, with SFT (no verification) reaching 51.8\% on GSM8K --- a modest 2.2 percentage point improvement over the 49.6\% baseline. Both DPO and CDPO begin at the baseline accuracy (checkpoint 0 is the unmodified model) and collapse rapidly: DPO drops to ${\sim}$6\% within the first 400 training steps, while CDPO collapses even faster to ${\sim}$1\% by step 600. Neither method recovers.
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}{0.48\textwidth}
+        \includegraphics[width=\textwidth]{figures/gsm8k_all_methods.png}
+        \caption{GSM8K}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.48\textwidth}
+        \includegraphics[width=\textwidth]{figures/math500_all_methods.png}
+        \caption{MATH-500}
+    \end{subfigure}
+    \caption{Evaluation accuracy over training checkpoints for all four methods. DPO and CDPO collapse rapidly from the baseline, while both SFT variants remain stable. CDPO collapses faster and to a lower floor than DPO.}
+    \label{fig:eval_curves}
+\end{figure}
+
+Figure~\ref{fig:training_metrics} reveals the mechanism behind this collapse. Despite the catastrophic drop in downstream accuracy, both DPO and CDPO show \textit{smoothly decreasing training loss} and \textit{reward accuracy approaching 1.0} throughout training. This is the classic signature of reward hacking: the model learns to separate chosen from rejected examples in implicit-reward space (by pushing log-probability ratios apart), but this optimisation does not correspond to improved generation quality --- it instead degrades the model's ability to produce coherent solutions.
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}{0.24\textwidth}
+        \includegraphics[width=\textwidth]{figures/dpo_training_loss.png}
+        \caption{DPO loss}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.24\textwidth}
+        \includegraphics[width=\textwidth]{figures/rdpo_training_loss.png}
+        \caption{CDPO loss}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.24\textwidth}
+        \includegraphics[width=\textwidth]{figures/dpo_reward_acc.png}
+        \caption{DPO reward acc.}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.24\textwidth}
+        \includegraphics[width=\textwidth]{figures/rdpo_reward_acc.png}
+        \caption{CDPO reward acc.}
+    \end{subfigure}
+    \caption{Training metrics for DPO and CDPO. Both methods show smoothly decreasing loss (a, b) and reward accuracy approaching 1.0 (c, d), despite the catastrophic collapse in downstream evaluation accuracy shown in Figure~\ref{fig:eval_curves}. This divergence between training metrics and actual performance is the hallmark of reward hacking.}
+    \label{fig:training_metrics}
+\end{figure}
+
+% ============================================================
+\section{Discussion}
+\label{sec:discussion}
+% ============================================================
+
+\subsection{DPO Collapse and Reward Hacking}
+
+The dramatic collapse of both DPO and CDPO, combined with smoothly improving training metrics, is a well-documented failure mode of DPO. \autocite{gao2025uncoveringimpactchainofthought} identify exactly this pattern in text-to-SQL: without chain-of-thought data, the implicit reward $\hat{r}_\theta$ can be inflated by superficial correlates that do not reflect reasoning quality --- model performance initially peaks then decreases, while the implicit reward continues to rise. Our results confirm this finding in the mathematical reasoning domain.
+
+At the 0.5B parameter scale, the model appears to lack sufficient capacity to simultaneously maintain generation quality and satisfy the DPO preference margin. The KL constraint (controlled by $\beta = 0.1$) is evidently insufficient to prevent the policy from drifting into a degenerate region of the output space.
+
+\subsection{CDPO Exacerbates Collapse}
+
+Rather than mitigating the DPO collapse as hypothesised, the critique NLL term in CDPO \textit{accelerates} it. CDPO's final-checkpoint accuracy on GSM8K (0.6\%) is an order of magnitude worse than DPO's (4.8\%). We identify two potential mechanisms:
+
+\textbf{Distributional mismatch.} The verification rationale $c_v$ is generated by an external oracle whose writing style, reasoning depth, and vocabulary differ substantially from the base model's natural distribution. This echoes findings from GenRM-STaR-DPO \autocite{mahan2024generativerewardmodels}, where off-policy rationales from a stronger model (GPT-4 or Llama-3.1-70B) matched STaR-DPO in-distribution but collapsed out-of-distribution. CLoud \autocite{ankner2024critiqueoutloudrewardmodels} similarly reports a 5.6\% drop when training on oracle critiques versus self-generated ones, attributing it to distributional shift between training and inference.
+
+\textbf{Task conflict.} The verification rationale is fundamentally different from the solution-generation task the model performs at inference. Verification text contains meta-analytical language (``Step 1: check\ldots'', ``Expected Answer: Correct'', ``Verification: Is the answer correct? Yes/No'') that is absent from problem-solving. Training the model to produce both types of text with a single set of LoRA parameters creates a multi-task conflict that degrades performance on the primary task. This is consistent with the observation from CFT \autocite{wang2025critiquefinetuninglearningcritique} that models trained on critique data generate direct answers at inference \textit{without producing critiques} --- the critique knowledge transfers implicitly. In our case, with the competing DPO gradient, this implicit transfer may be disrupted.
+
+\subsection{Why Verification Data Does Not Help SFT Either}
+
+Both SFT variants perform comparably, with SFT (no verification) slightly ahead. This suggests that, at the 0.5B scale, the model cannot usefully extract signal from verification-style text when its inference-time task is solution generation. The verification rationale is informative about \textit{what makes a solution correct}, but this information does not straightforwardly transfer to \textit{producing correct solutions}. This aligns with the broader finding that verification and generation are distinct capabilities that may require separate training \autocite{hosseini2024vstartrainingverifiersselftaught}.
+
+% ============================================================
+\section{Conclusion}
+\label{sec:conclusion}
+% ============================================================
+
+We proposed Critique DPO (CDPO), which extends the DPO objective with an auxiliary NLL term on a verifier's chain-of-thought critique. We evaluated CDPO against DPO and SFT baselines on Qwen2.5-0.5B-Instruct using 120{,}000 math preference triples from the GenRM dataset, with evaluation on GSM8K and MATH-500.
+
+Our results are a negative finding: both DPO and CDPO suffer catastrophic performance collapse, with CDPO collapsing faster and more severely than vanilla DPO. The critique NLL term, intended to transfer the verifier's analytical capabilities to the base model, instead exacerbates the well-documented DPO reward-hacking failure mode. Meanwhile, simple SFT on correct solutions provides modest but stable improvements, and adding verification rationales to SFT yields no additional benefit.
+
+These results contribute to the growing understanding of when and how auxiliary reasoning signals can improve fine-tuning. Our findings suggest that verifier critique is most effective when used to train models that will \textit{produce} critiques (judges and verifiers), rather than models that will produce solutions (base policies). Future work should explore: (1) on-policy critique generation (STaR-style self-generated rationales instead of off-policy oracle critiques), (2) larger model scales where the multi-task learning implicit in CDPO may become tractable, (3) iterative reference model updates to prevent the distributional drift that drives collapse, and (4) curriculum scheduling of $\alpha$ to reduce the critique weight as training progresses.
+
+
+% ============================================================
+\newpage
+\appendix
+\section{CDPO Training Algorithm}
+\label{app:algorithm}
+
+Algorithm~\ref{alg:cdpo} presents the pseudocode for CDPO training, corresponding to the implementation in \texttt{CustomCDPOTrainer}.
+
+\begin{algorithm}[H]
+    \caption{CDPO Training (per batch)}
+    \label{alg:cdpo}
+    \begin{algorithmic}[1]
+        \Require Policy $\pi_\theta$, reference $\pi_{\text{ref}}$, batch $\{(x_i, y_{w,i}, y_{l,i}, c_{v,i})\}_{i=1}^{B}$, weights $\alpha$, $\beta$
+        \State \textbf{Concatenate} chosen, rejected, and critique into single batch of size $3B$
+        \State $\text{logits} \gets \pi_\theta(\text{batch})$ \Comment{Single forward pass, shape $3B \times T \times V$}
+        \State $\text{all\_logps}, \text{lengths} \gets \textsc{GetBatchLogps}(\text{logits}, \text{labels})$ \Comment{Shape $3B$}
+        \State \textbf{Delete} logits; free GPU memory
+        \State $\log \pi_\theta(y_w), \log \pi_\theta(y_l), \log \pi_\theta(c_v) \gets \textsc{Split}(\text{all\_logps}, B)$
+        \State $L_w, L_l, L_c \gets \textsc{Split}(\text{lengths}, B)$ \Comment{Valid token counts}
+        \Statex
+        \State \textbf{// Reference model log-probs (LoRA: disable adapter)}
+        \State $\log \pi_{\text{ref}}(y_w), \log \pi_{\text{ref}}(y_l) \gets$ same procedure with $\pi_{\text{ref}}$
+        \Statex
+        \State \textbf{// Implicit rewards}
+        \State $\hat{r}_w \gets \beta \left(\log \pi_\theta(y_w) - \log \pi_{\text{ref}}(y_w)\right)$
+        \State $\hat{r}_l \gets \beta \left(\log \pi_\theta(y_l) - \log \pi_{\text{ref}}(y_l)\right)$
+        \Statex
+        \State $\mathcal{L}_{\text{DPO}} \gets -\log \sigma(\hat{r}_w - \hat{r}_l)$
+        \State $\mathcal{L}_{\text{critique}} \gets -\log \pi_\theta(c_v) \;/\; L_c$ \Comment{Length-normalised NLL}
+        \State $\mathcal{L}_{\text{CDPO}} \gets \text{mean}\!\left[(1 - \alpha)\,\mathcal{L}_{\text{DPO}} + \alpha\,\mathcal{L}_{\text{critique}}\right]$
+        \State \Return $\mathcal{L}_{\text{CDPO}}$
+    \end{algorithmic}
+\end{algorithm}
+
+% ============================================================
+\section{Data Processing Pipeline}
+\label{app:data}
+
+The data processing pipeline consists of three stages:
+
+\textbf{Stage 1: Download and extract.} The raw GenRM dataset is downloaded from HuggingFace (\texttt{flowingpurplecrane/genrm}, \texttt{critiques} split). Each entry in the raw dataset contains: an \texttt{inputs} field (the problem prompt concatenated with a model-generated solution and a verification prompt), a \texttt{targets} field (the LLM oracle's step-by-step verification rationale for that specific solution), a \texttt{target} field (the ground-truth numerical answer), and metadata (\texttt{question\_id}, \texttt{model\_output\_id}). We extract from \texttt{inputs}: (a) the math problem (text between \texttt{\textbackslash nQ:} and \texttt{\textbackslash nA:}), and (b) the model-generated solution (text between \texttt{\textbackslash nA:} and \texttt{\textbackslash nVerification}). Each entry is labelled correct or incorrect by extracting the final answer from the solution and comparing against \texttt{target}.
+
+\textbf{Stage 2: Pair.} We filter for problems (\texttt{question\_id}s) that have \textit{both} at least one correct and at least one incorrect solution. For each eligible problem, we pair one correct solution with one incorrect solution (without replacement, so each \texttt{model\_output\_id} is used at most once). We then randomly sample pairs to reach the target dataset size (120{,}000 pairs from 6{,}452 eligible problems). The resulting ``master'' dataset has alternating correct/incorrect rows.
+
+\textbf{Stage 3: Format into variants.} From each (correct, incorrect) pair in the master dataset, we produce four dataset formats:
+\begin{itemize}
+    \item \textbf{CDPO}: The composite critique $c_v$ is constructed by concatenating both solutions and both of their individual verification rationales (from the \texttt{targets} column) with connecting phrases (``This is a correct solution and preferred:'', etc.), as described in Section~\ref{sec:data}.
+    \item \textbf{DPO}: The chosen and rejected solutions only, without any verification data.
+    \item \textbf{SFT (no verification)}: Only the correct solution is kept, formatted as instruction/input/output.
+    \item \textbf{SFT (with verification)}: The correct solution is concatenated with its individual verification rationale $c_{v,w}$ (from the correct entry's \texttt{targets} column), preceded by ``Verification: Let's verify step by step.''
+\end{itemize}
+
+% ============================================================
+\section{Full Checkpoint Results}
+\label{app:full_results}
+
+Tables~\ref{tab:dpo_full}--\ref{tab:sft_veri_full} report the complete checkpoint-by-checkpoint evaluation results.
+
+\begin{table}[H]
+    \centering
+    \small
+    \caption{DPO: accuracy (\%) at each checkpoint.}
+    \label{tab:dpo_full}
+    \begin{tabular}{rcc}
+        \hline
+        \textbf{Checkpoint} & \textbf{GSM8K} & \textbf{MATH-500} \\
+        \hline
+        0                   & 49.6           & 34.4              \\
+        200                 & 31.4           & 19.6              \\
+        400                 & 5.8            & 6.8               \\
+        600                 & 7.8            & 6.8               \\
+        800                 & 4.0            & 3.0               \\
+        1000                & 4.4            & 3.0               \\
+        1200                & 3.0            & 2.0               \\
+        1400                & 2.4            & 3.2               \\
+        1600                & 3.6            & 3.0               \\
+        1800                & 2.6            & 2.6               \\
+        2000                & 4.2            & 2.8               \\
+        2200                & 6.2            & 4.4               \\
+        2400                & 5.6            & 3.2               \\
+        2500                & 4.8            & 3.2               \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \small
+    \caption{CDPO ($\alpha = 0.5$): accuracy (\%) at each checkpoint.}
+    \label{tab:cdpo_full}
+    \begin{tabular}{rcc}
+        \hline
+        \textbf{Checkpoint} & \textbf{GSM8K} & \textbf{MATH-500} \\
+        \hline
+        0                   & 49.6           & 34.4              \\
+        200                 & 14.8           & 17.0              \\
+        400                 & 11.0           & 12.2              \\
+        600                 & 1.0            & 4.6               \\
+        800                 & 0.8            & 2.8               \\
+        1000                & 1.0            & 2.2               \\
+        1200                & 1.8            & 1.4               \\
+        1400                & 0.6            & 0.8               \\
+        1600                & 0.4            & 0.6               \\
+        1800                & 0.6            & 0.8               \\
+        2000                & 0.2            & 0.6               \\
+        2200                & 0.8            & 0.6               \\
+        2400                & 1.4            & 1.2               \\
+        2500                & 0.6            & 0.8               \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \small
+    \caption{SFT (no verification): accuracy (\%) at each checkpoint.}
+    \label{tab:sft_noveri_full}
+    \begin{tabular}{rcc}
+        \hline
+        \textbf{Checkpoint} & \textbf{GSM8K} & \textbf{MATH-500} \\
+        \hline
+        0                   & 49.6           & 34.4              \\
+        63                  & 47.0           & 31.0              \\
+        126                 & 49.6           & 35.2              \\
+        189                 & 50.0           & 32.6              \\
+        252                 & 50.4           & 34.2              \\
+        315                 & 51.0           & 33.2              \\
+        378                 & 51.2           & 34.0              \\
+        441                 & 51.4           & 35.0              \\
+        504                 & 51.4           & 34.4              \\
+        567                 & 50.0           & 35.4              \\
+        626                 & 51.8           & 32.6              \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \small
+    \caption{SFT (with verification): accuracy (\%) at each checkpoint.}
+    \label{tab:sft_veri_full}
+    \begin{tabular}{rcc}
+        \hline
+        \textbf{Checkpoint} & \textbf{GSM8K} & \textbf{MATH-500} \\
+        \hline
+        0                   & 49.6           & 34.4              \\
+        94                  & 48.8           & 35.0              \\
+        188                 & 47.8           & 33.2              \\
+        282                 & 50.8           & 35.2              \\
+        376                 & 50.8           & 32.8              \\
+        470                 & 50.4           & 32.8              \\
+        564                 & 50.4           & 35.0              \\
+        658                 & 49.8           & 33.0              \\
+        752                 & 50.2           & 32.6              \\
+        846                 & 49.6           & 34.4              \\
+        938                 & 50.8           & 33.0              \\
+        \hline
+    \end{tabular}
+\end{table}
+
+% ============================================================
+\section{Hyperparameter Details}
+\label{app:hparams}
+
+Table~\ref{tab:full_hparams} lists all training hyperparameters.
+
+\begin{table}[H]
+    \centering
+    \small
+    \caption{Complete training hyperparameters for all methods.}
+    \label{tab:full_hparams}
+    \begin{tabular}{lcccc}
+        \hline
+        \textbf{Parameter}         & \textbf{CDPO}                                              & \textbf{DPO} & \textbf{SFT-veri} & \textbf{SFT-no\_veri} \\
+        \hline
+        Base model                 & \multicolumn{4}{c}{Qwen2.5-0.5B-Instruct}                                                                             \\
+        Fine-tuning method         & \multicolumn{4}{c}{LoRA (rank 8, all linear modules)}                                                                 \\
+        Learning rate              & \multicolumn{4}{c}{$1 \times 10^{-6}$}                                                                                \\
+        LR scheduler               & \multicolumn{4}{c}{Cosine with 10\% warmup}                                                                           \\
+        Training epochs            & \multicolumn{4}{c}{2}                                                                                                 \\
+        Precision                  & \multicolumn{4}{c}{bf16}                                                                                              \\
+        Attention                  & \multicolumn{4}{c}{FlashAttention-2}                                                                                  \\
+        Parallelism                & \multicolumn{4}{c}{DeepSpeed ZeRO Stage 3, 8$\times$ H100}                                                            \\
+        \hline
+        Batch size / GPU           & 6                                                          & 16           & 32                & 48                    \\
+        Cutoff length (tokens)     & 1664                                                       & 640          & 1024              & 768                   \\
+        $\beta$ (DPO temperature)  & 0.1                                                        & 0.1          & ---               & ---                   \\
+        $\alpha$ (critique weight) & 0.5                                                        & ---          & ---               & ---                   \\
+        Normalise critique         & Yes                                                        & ---          & ---               & ---                   \\
+        Preference loss            & sigmoid                                                    & sigmoid      & ---               & ---                   \\
+        Gradient checkpointing     & Yes                                                        & No           & Yes               & Yes                   \\
+        Dataset size               & 120K                                                       & 120K         & 120K              & 120K                  \\
+        Save frequency             & 10\%                                                       & 10\%         & 10\%              & 10\%                  \\
+        \hline
+    \end{tabular}
+\end{table}
+
+% ============================================================
+\section{Training Systems and Infrastructure}
+\label{app:systems}
+
+This appendix describes the systems-level techniques that made training feasible on our hardware. We cover parameter-efficient fine-tuning (LoRA), mixed-precision arithmetic, memory-efficient attention, and distributed training via DeepSpeed ZeRO. These are standard techniques, but understanding their interaction is essential for reproducing our results and for appreciating the memory constraints that shaped our experimental design --- particularly the batch size limitations for CDPO.
+
+% ------------------------------------------------------------
+\subsection{Low-Rank Adaptation (LoRA)}
+
+Full fine-tuning updates all $|\theta|$ parameters of the model, requiring storage of the full gradient and optimiser states ($2|\theta|$ floats for Adam's first and second moments). For a 0.5B-parameter model in bf16, the model weights alone occupy ${\sim}$1\,GB, but Adam states in fp32 add ${\sim}$8\,GB.
+
+LoRA freezes the pretrained weights $W_0 \in \mathbb{R}^{d \times k}$ and injects a low-rank update:
+$$
+    W = W_0 + \Delta W = W_0 + BA, \qquad B \in \mathbb{R}^{d \times r},\; A \in \mathbb{R}^{r \times k},\; r \ll \min(d, k)
+$$
+Only $A$ and $B$ are trained. The number of trainable parameters is $r(d + k)$ per adapted layer, versus $dk$ for full fine-tuning. With rank $r = 8$ applied to all linear modules of Qwen2.5-0.5B-Instruct, the trainable parameter count is ${\sim}$1.6M --- roughly 0.3\% of the full model.
+
+A scaling factor $\frac{\alpha_{\text{LoRA}}}{r}$ is applied to the low-rank update, where $\alpha_{\text{LoRA}}$ controls the magnitude (we use $\alpha_{\text{LoRA}} = 2r = 16$). At initialisation, $A$ is drawn from a Gaussian and $B$ is set to zero, so $\Delta W = 0$ and the model begins from the pretrained checkpoint.
+
+\textbf{Reference model in LoRA.} DPO and CDPO require a frozen reference model $\pi_{\text{ref}}$. With LoRA, the reference is the base model \textit{without} the adapter --- obtained by temporarily disabling the LoRA layers during the reference forward pass. This avoids loading a second copy of the model into GPU memory, effectively halving the memory cost of the reference model compared to full fine-tuning.
+
+% ------------------------------------------------------------
+\subsection{Mixed-Precision Training (bf16)}
+
+We train in bfloat16 (bf16) mixed precision. bf16 uses 1 sign bit, 8 exponent bits, and 7 mantissa bits, providing the same dynamic range as fp32 (${\sim}10^{\pm38}$) but with reduced precision (${\sim}$3 decimal digits vs ${\sim}$7). Compared to fp16 (5 exponent bits, 10 mantissa bits), bf16 trades mantissa precision for a much larger exponent range, eliminating the overflow and loss-scaling issues that plague fp16 training.
+
+The memory savings are straightforward: each parameter and activation occupies 2 bytes instead of 4, halving the memory footprint of the forward and backward passes. The Adam optimiser states (first and second moments) are maintained in fp32 for numerical stability, but gradients and activations are computed and communicated in bf16.
+
+In our implementation, we explicitly avoid upcasting the logits tensor to fp32 during the CDPO forward pass (the default in some DPO implementations). Since the logits tensor has shape $3B \times T \times V$ and the vocabulary size $V = 151{,}936$ for Qwen2.5, this tensor alone can occupy several gigabytes. Keeping it in bf16 approximately halves this cost, which is critical for CDPO where the batch dimension is $3\times$ larger than standard DPO.
+
+% ------------------------------------------------------------
+\subsection{FlashAttention-2}
+
+Standard self-attention computes $\text{Attention}(Q, K, V) = \text{softmax}\!\left(\frac{QK^\top}{\sqrt{d_k}}\right) V$, materialising the full $T \times T$ attention matrix in GPU memory. For sequence length $T$, this requires $\mathcal{O}(T^2)$ memory and $\mathcal{O}(T^2 d)$ compute.
+
+FlashAttention-2 computes the \textit{exact same result} without materialising the full attention matrix, by using a tiled algorithm that operates on blocks of $Q$, $K$, $V$ that fit in GPU SRAM (on-chip memory). The key insight is that softmax can be decomposed into local block-wise computations with a running correction for the normalisation constant (online softmax). The memory complexity drops to $\mathcal{O}(T)$ and the wall-clock time is reduced by $2$--$4\times$ due to fewer HBM (off-chip memory) reads.
+
+For our experiments with cutoff lengths up to 1664 tokens, FlashAttention-2 reduces the per-layer attention memory from $T^2 \cdot \text{num\_heads} \cdot \text{sizeof(bf16)}$ (quadratic) to linear in $T$, freeing memory for larger batch sizes.
+
+% ------------------------------------------------------------
+\subsection{Gradient Checkpointing}
+
+During the backward pass, computing gradients requires the intermediate activations from the forward pass. Naively, all activations are stored, giving memory cost $\mathcal{O}(L \cdot B \cdot T \cdot d)$ where $L$ is the number of layers. Gradient checkpointing trades compute for memory: only a subset of activations (typically at layer boundaries) are stored, and the intermediate activations are \textit{recomputed} during the backward pass from the nearest checkpoint.
+
+For a transformer with $L$ layers, checkpointing at every layer boundary reduces activation memory from $\mathcal{O}(L)$ to $\mathcal{O}(\sqrt{L})$ per layer's internal activations (since only one layer's activations need to be live at a time), at the cost of one additional forward pass per layer. In practice this adds ${\sim}$30\% wall-clock overhead but can reduce activation memory by $60$--$70\%$.
+
+We enable gradient checkpointing for CDPO and both SFT variants. For DPO, the smaller batch size and shorter sequences meant gradient checkpointing was not strictly necessary; we disabled it to reduce training time.
+
+% ------------------------------------------------------------
+\subsection{DeepSpeed ZeRO Stage 3}
+
+Training is distributed across 8 $\times$ H100 80\,GB GPUs using DeepSpeed ZeRO (Zero Redundancy Optimizer) Stage 3. Without ZeRO, data-parallel training replicates the full model, gradients, and optimiser states on every GPU --- a $3\times$ memory redundancy per parameter.
+
+ZeRO eliminates this redundancy by \textit{partitioning} model states across GPUs:
+
+\begin{itemize}
+    \item \textbf{Stage 1} partitions optimiser states (Adam moments). Each GPU stores $1/N$ of the optimiser state ($N$ = number of GPUs). Memory per GPU: model + gradients + $\frac{1}{N}$ optimiser.
+    \item \textbf{Stage 2} additionally partitions gradients. Memory per GPU: model + $\frac{1}{N}$ (gradients + optimiser).
+    \item \textbf{Stage 3} additionally partitions model parameters. Memory per GPU: $\frac{1}{N}$ (model + gradients + optimiser).
+\end{itemize}
+
+With Stage 3, the memory per GPU scales as $\mathcal{O}(|\theta|/N)$ rather than $\mathcal{O}(|\theta|)$. The cost is increased communication: parameters must be gathered (all-gathered) before each forward and backward computation, and gradients must be reduce-scattered after each backward step. The \texttt{overlap\_comm: true} setting in our DeepSpeed configuration overlaps these communications with computation to hide latency.
+
+For our 0.5B model on 8 GPUs, Stage 3 reduces the per-GPU model state memory from ${\sim}$4\,GB (model + optimiser in fp32) to ${\sim}$0.5\,GB, freeing the remaining ${\sim}$79\,GB for activations, the logits tensor, and batch data. This is essential for CDPO, where the $3B \times T \times V$ logits tensor is the dominant memory consumer.
+
+% ------------------------------------------------------------
+\subsection{Memory Analysis for CDPO}
+
+The peak memory bottleneck in CDPO is the logits tensor produced by the forward pass. With batch size $B = 6$ per GPU, three sequences per example (chosen, rejected, critique), maximum sequence length $T = 1664$, and vocabulary size $V = 151{,}936$:
+$$
+    \text{Logits memory} = 3B \times T \times V \times 2\;\text{bytes} = 18 \times 1664 \times 151{,}936 \times 2 \approx 8.6\;\text{GB}
+$$
+This single tensor consumes over 10\% of the GPU's 80\,GB HBM. After extracting the per-token log-probabilities via \texttt{get\_batch\_logps()} (which reduces to a $3B$-dimensional vector), we immediately delete the logits tensor and call \texttt{torch.cuda.empty\_cache()} to return this memory to the allocator. Without this explicit deallocation, PyTorch's caching allocator would retain the memory, potentially causing OOM errors during the reference model's forward pass (which produces a second logits tensor of the same size).
+
+The combination of all techniques --- LoRA (small trainable parameter set), bf16 (halved activation memory), FlashAttention-2 (linear attention memory), gradient checkpointing (reduced activation storage), ZeRO-3 (partitioned model states), and explicit logits deletion --- was necessary to fit CDPO training within the 80\,GB per-GPU budget. Even so, the batch size was limited to 6 per GPU (vs.\ 16 for DPO and 48 for SFT), reflecting the $3\times$ memory multiplier from processing three sequences per example.
 
 \printbibliography
 
