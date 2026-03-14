@@ -37,7 +37,7 @@
 }
 
 
-\geometry{a4paper,tmargin=10mm,bmargin=20mm,lmargin=20mm,rmargin=14mm}
+\geometry{a4paper,tmargin=20mm,bmargin=20mm,lmargin=20mm,rmargin=20mm}
 
 
 \usepackage[english]{babel}
@@ -86,17 +86,17 @@
 \maketitle
 
 \begin{abstract}
-    Direct Preference Optimization (DPO) enables fine-tuning language models from pairwise preferences without reinforcement learning. We propose Critique DPO (CDPO), which augments the DPO loss with an additional negative log-likelihood term on an external verifier's chain-of-thought critique. We evaluate CDPO against DPO and SFT baselines on Qwen2.5-0.5B-Instruct using 120{,}000 math preference triples from the GenRM dataset with math problems from GSM8K. Our results are a negative finding: both DPO and CDPO suffer performance collapse on GSM8K and MATH-500, with CDPO collapsing faster than vanilla DPO.
+    Direct Preference Optimization (DPO) enables fine-tuning language models from pairwise preferences without reinforcement learning. We propose Critique DPO (CDPO), which augments the DPO loss with an additional negative log-likelihood term on an external verifier's chain-of-thought critique. We evaluate CDPO against DPO and SFT baselines on Qwen2.5-0.5B-Instruct using 120{,}000 math preference triples from the GenRM dataset with math problems from GSM8K. Our results are a negative finding: both DPO and CDPO suffer reward-hacking and performance collapse on GSM8K and MATH-500, with CDPO collapsing faster than vanilla DPO.
 \end{abstract}
 
 
 \section{Introduction}
 
-As large language models (LLMs) become more capable, fine-tuning techniques to align with human intent are increasingly important. A key consideration for aligning these models is how to most effectively use human resources, or model resources in the case where LLMs themselves are used as oracles. Reinforcement learning from Human or AI preferences (RLHF/RLAIF) is the most prominent example of such a technique but is complex and often unstable. Direct Preference Optimization (DPO) \autocite{rafailov2024directpreferenceoptimizationlanguage} has recently been proposed as a simpler and more stable alternative, bypassing the reward modelling and RL steps entirely. However, DPO reduces the oracle's judgement to a single binary label --- preferred or rejected --- discarding any reasoning the oracle provides for its preference.
+As large language models (LLMs) become more capable, fine-tuning techniques to align with human intent are increasingly important. A key consideration for aligning these models is how to most effectively use human resources, or model resources in the case where LLMs themselves are used as oracles. Reinforcement learning from human or AI preferences (RLHF/RLAIF) is the most prominent example of such a technique but is complex and often unstable. Direct Preference Optimization (DPO) \autocite{rafailov2024directpreferenceoptimizationlanguage} has recently been proposed as a simpler and more stable alternative, bypassing the reward modelling and RL steps entirely. However, DPO reduces the oracle's judgement to a single binary label --- preferred or rejected --- discarding any reasoning the oracle provides for its preference.
 
-Asking these oracles to provide reasoning for their binary preferences is common practice. In particular, for LLM-as-a-judge style workflows, asking the model to provide chain-of-thought reasoning has been shown to improve the quality of the judgements themselves. This raises a natural question: can we leverage the oracle's reasoning --- not just its binary label --- when fine-tuning the target model?
+Asking these oracles to provide reasoning for their binary preferences is common practice. In particular, for LLM-as-a-judge style workflows, asking the model to provide chain-of-thought reasoning has been shown to improve the quality of the judgements themselves. This raises a natural question: can we leverage the oracle's reasoning --- not just its binary label --- to improve training sample effiency when fine-tuning the base model?
 
-In this work, we propose Critique DPO (CDPO), which augments the DPO objective with a negative log-likelihood term on the verifier's chain-of-thought critique, training the base policy to reproduce the step-by-step verification reasoning alongside learning from pairwise preferences. We evaluate CDPO on mathematical reasoning using Qwen2.5-0.5B-Instruct and the GenRM dataset. Our results are a negative finding: CDPO collapses faster and more severely than vanilla DPO, which itself suffers catastrophic performance degradation at this smaller scale. We analyse this failure and discuss implications for the design of critique-augmented training methods.
+In this work, we propose Critique DPO (CDPO), which augments the DPO objective with a negative log-likelihood term on the verifier's chain-of-thought critique, training the base policy to reproduce step-by-step verification reasoning alongside learning from pairwise preferences. Our experiments on Qwen2.5-0.5B-Instruct yield a negative finding: the critique term exacerbates rather than mitigates DPO's reward-hacking failure mode. We analyse this collapse and its implications for critique-augmented training.
 
 \section{Background: DPO}
 
@@ -174,12 +174,10 @@ the DPO loss is
 \end{equation}
 This is identical in form to the reward model loss \eqref{eq:reward-model-objective}, but conditioned on the policy parameters $\theta$ instead of the reward model parameters $\phi$. Traditionally, RLHF performs MLE on $\mathcal{D}$ conditioned on $\phi$ to learn a reward model, then uses RL to find the optimal policy for that reward. DPO instead performs MLE on $\mathcal{D}$ conditioned directly on $\theta$. Because of the reward--policy bijection, improving $\pi_\theta$ to better fit the preference data simultaneously yields an implicit reward $\hat{r}_\theta$ for which $\pi_\theta$ is guaranteed to be optimal. This eliminates both the reward modelling step and the RL step, requiring only two models in memory (the policy $\pi_\theta$ and the frozen reference $\pi_{\text{ref}}$).
 
-In this work we suggest simple extensions to this objective.
-
 \section{Literature Review}
 \label{sec:lit}
 
-We review research incorporating reasoning and critique data into fine-tuning, building toward the critique-augmented preference optimisation approach of this work. We adopt a unified notation: $\pi_\theta$ denotes the learnable policy, $\pi_{\text{ref}}$ the frozen reference (usually the base SFT model), $x$ the prompt, $y_w$ and $y_l$ the preferred and rejected responses, $c$ a model's own chain-of-thought reasoning trace, $c_v$ a verifier's chain-of-thought for the critique, whether from an external oracle or generated by the model itself, $r_\phi(x,y)$ a learned scalar reward, and $\hat{r}_\theta(x,y) = \beta \log \frac{\pi_\theta(y|x)}{\pi_{\text{ref}}(y|x)}$ the implicit reward.
+We review research incorporating reasoning and critique data into fine-tuning, building toward the critique-augmented preference optimisation approach of this work. We adopt a unified notation: $\pi_\theta$ denotes the learnable policy, $\pi_{\text{ref}}$ the frozen reference (usually the base SFT model), $x$ the prompt, $y_w$ and $y_l$ the preferred and rejected responses, $c$ a model's own chain-of-thought reasoning trace, $c_v$ a verifier's chain-of-thought for the critique, whether from an external oracle or generated by the model itself, $r_\phi(x,y)$ a learned reward (where $\phi$ parameterises any judge, verifier, or reward model), and $\hat{r}_\theta(x,y) = \beta \log \frac{\pi_\theta(y|x)}{\pi_{\text{ref}}(y|x)}$ the implicit reward.
 
 The review is organised around a central question: \textit{what kind of signal is being used, and for which model?} The narrative moves from binary AI feedback (Section~\ref{sec:cot-motivation}), through enriching DPO with supervised reasoning targets (Section~\ref{sec:dpo-nll}), to methods that improve verifiers by having them reason (Section~\ref{sec:gen-verify}), and finally to the closest work --- methods that bring verifier critique directly into the base model's training objective (Section~\ref{sec:base-critique}).
 
@@ -188,46 +186,29 @@ The review is organised around a central question: \textit{what kind of signal i
 \label{sec:cot-motivation}
 % ============================================================
 
-\subsubsection{RLAIF and the Information Bottleneck}
+\subsubsection{RLAIF}
 
 RL from AI Feedback (RLAIF) replaces human annotators with LLM oracles. \autocite{bai2022constitutionalaiharmlessnessai} first use LLM-generated labels for harmlessness finetuning, doing RL with a preference model trained with LLM preferences. \autocite{lee2024rlaifvsrlhfscaling} use LLM to directly give rewards, showing that RLAIF matches or exceeds RLHF on summarisation and dialogue, even when the labeller is the same model being aligned. \autocite{li2024hrlaifimprovementshelpfulnessharmlessness} instruct the labeller to reason explicitly and report modest improvements. A shared limitation is that the oracle's reasoning is discarded after labelling: the sole training signal is a binary or scalar preference label, creating an information bottleneck that the remainder of this review seeks to address.
 
 \subsubsection{Impact of Chain-of-Thought Data for DPO}
 \label{sec:cot-dpo}
 
-\autocite{gao2025uncoveringimpactchainofthought} provide a systematic empirical study of CoT's impact on DPO. In text-to-SQL --- where preference datasets traditionally contain only final SQL queries \textit{without} reasoning steps --- DPO degrades performance across the majority of ten tested LLMs. Augmenting the same datasets with synthetically generated chain-of-thought solutions achieves consistent DPO improvements for the first time. The analysis identifies three mechanisms. First, \textit{reward hacking mitigation}: without CoT, the implicit reward \eqref{eq:implicit_reward} can be inflated by superficial correlates (longer SQL, non-executable patterns) that do not reflect reasoning quality. Model performance initially peaks then decreases, while the implicit reward continues to rise. With CoT, the model's self-assessed implicit reward tracks actual performance. Second, \textit{discriminative calibration}: CoT-trained models maintain stable classification accuracy between correct and incorrect solutions throughout training, whereas vanilla DPO becomes unstable. Third, \textit{sample efficiency}: CoT-augmented DPO continues to improve with additional data, while vanilla DPO saturates. 2 samples of CoT with DPO achieves the same performance gains as 16 samples of vanilla DPO.
-
-This finding directly motivates our approach: if the model's own CoT improves DPO, then an external verifier's critique --- which provides a richer perspective on why one response is preferred --- should be informative too.
+\autocite{gao2025uncoveringimpactchainofthought} provide a systematic empirical study of CoT's impact on DPO. In text-to-SQL --- where preference datasets traditionally contain only final SQL queries \textit{without} reasoning steps --- DPO degrades performance across the majority of ten tested LLMs. Augmenting the same datasets with synthetically generated chain-of-thought solutions achieves consistent DPO improvements for the first time. The analysis identifies three mechanisms. First, \textit{reward hacking mitigation}: without CoT, the implicit reward \eqref{eq:implicit_reward} can be inflated by superficial correlates (longer SQL, non-executable patterns) that do not reflect reasoning quality. Model performance initially peaks then decreases, while the implicit reward continues to rise. With CoT, the implicit reward tracks actual performance. Second, \textit{discriminative calibration}: CoT maintains stable accuracy in distinguishing correct from incorrect solutions, whereas vanilla DPO becomes unstable. Third, \textit{sample efficiency}: CoT-augmented DPO continues to improve with additional data, while vanilla DPO saturates.
 
 \subsubsection{Self-Taught Reasoning: STaR and V-STaR}
 
 \textbf{STaR.} \autocite{zelikman2022starbootstrappingreasoningreasoning} establish that CoT data, even when self-generated, is a richer training signal than outcome labels alone. Given a pretrained model $M$ and a dataset $\mathcal{D} = \{(x_i, y_i)\}$ of problems with ground-truth answers, STaR begins with a small few-shot prompt set $\mathcal{P}$ containing rationale examples. At each iteration, the model generates a reasoning trace $\hat{c}_i$ and answer $\hat{y}_i$ for every problem, using $\mathcal{P}$ in the context. Only correct generations where $\hat{y}_i = y_i$ are retained; the model is then fine-tuned on this filtered set with the standard NLL objective on rationale-answer pairs:
 \begin{equation}
-    \mathcal{L}_{\text{STaR}}(M) = -\mathbb{E}_{(x,y) \sim \mathcal{D}} \left[\,\mathbf{1}[\hat{y} = y]\cdot \sum_{t} \log M(\hat{c}_t, \hat{y}_t \mid x, \hat{c}_{<t})\right]
+    \mathcal{L}_{\text{STaR}}(M) = -\mathbb{E}_{(x,y) \sim \mathcal{D}} \left[\,\mathbf{1}[\hat{y} = y]\cdot \left(\sum_{t=1}^{|\hat{c}|} \log M(\hat{c}_t \mid x, \hat{c}_{<t}) + \log M(\hat{y} \mid x, \hat{c})\right)\right]
     \label{eq:star}
 \end{equation}
 
-STaR with rationalization matches GPT-3 (30$\times$ larger) on CommonsenseQA while using only 86.7\% of training data. The method demonstrates that self-generated rationales -- even produced with $|\mathcal{P}| = 10$ few-shot examples -- provide a dramatically richer training signal than training on final answers alone.
-
-\vspace{1em}
-\textbf{V-STaR.} \autocite{hosseini2024vstartrainingverifiersselftaught} identify the core inefficiency of STaR: the large number of \emph{incorrect} self-generated solutions is discarded, despite containing information about error patterns. V-STaR repurposes these failures to co-train a generator $G$ and a verifier $V$ in parallel across $T$ iterations.
-
-They maintain two accumulating datasets: $\mathcal{D}_{\text{GEN}}$: correct solutions $(x, \hat{y})$, used for generator SFT, and $\mathcal{D}_{\text{VER}}$: \emph{all} generated solutions $(x, \hat{y}, z)$, used for verifier training. At each iteration $t$, $k=16$ solutions per problem are sampled from $G^t$ and automatically labeled for correctness --- by comparing the extracted final answer against the ground-truth answer for math, or by running test cases for code. Correct solutions are appended to $\mathcal{D}_{\text{GEN}}$; all solutions are appended to $\mathcal{D}_{\text{VER}}$. $G^t$ is fine-tuned on $\mathcal{D}_{\text{GEN}}^{<t}$ with the standard NLL loss Eq.~\eqref{eq:star}. From $\mathcal{D}_{\text{VER}}$, preference pairs $(x, y^+, y^-)$ are formed by taking the pair of all correct solutions $y^+$ and all incorrect solutions $y^-$ for each problem $x$. The verifier is trained with DPO using $G_{\text{SFT}}$ (the base model fine-tuned once) as the fixed reference policy:
+\textbf{V-STaR.} \autocite{hosseini2024vstartrainingverifiersselftaught} extend STaR by repurposing incorrect solutions (discarded by STaR) to co-train a verifier $V$ alongside the generator $G$. At each iteration, the generator is fine-tuned via SFT on correct solutions using Eq.~\eqref{eq:star}. The verifier is trained with DPO on preference pairs $(x, y^+, y^-)$, formed by pairing correct and incorrect solutions for each problem, using $G_{\text{SFT}}$ (the base model fine-tuned once) as the fixed reference policy:
 \begin{equation}
     \mathcal{L}_{\text{DPO}}(V^t;\, G_{\text{SFT}}) = -\mathbb{E}_{(x, y^+, y^-) \sim \mathcal{D}_{\text{VER}}} \!\left[\log \sigma\!\left(\hat{r}(x, y^+) - \hat{r}(x, y^-)\right)\right], \quad \hat{r}(x, y) = \beta \log \frac{V^t(y \mid x)}{G_{\text{SFT}}(y \mid x)}
     \label{eq:vstar}
 \end{equation}
-
-At inference time, the verifier is used in Best-of-k reranking to choose solutions for better performance. Crucially, the verifier provides no training-time signal to the generator. The generator is trained purely via SFT on correct solutions (identical to STaR). The verifier's direct contribution is better performance at inference via Best-of-$k$ reranking. As the generator improves across iterations it produces harder-to-distinguish incorrect solutions, enriching $\mathcal{D}_{\text{VER}}$. However this does not feed any gradient back into the generator's training. This distinguishes V-STaR from later methods. Nevertheless, V-STaR 7B surpasses LLaMA-2 70B (8-shot) on GSM8K and nearly matches CodeLLaMA 34B on HumanEval in out-of-domain transfer, which illustrates the value of CoT training signals.
-
-\subsubsection{Self-Rewarding Language Models}
-\label{sec:self-rewarding}
-
-\autocite{yuan2024selfrewardinglanguagemodels} propose having the model act as its own reward model: the \emph{same} model $M_t$ both generates candidate responses and scores them. To bootstrap this self-evaluation capability, the model is first SFT'd on seed evaluation data (EFT) --- examples of (instruction, response, CoT justification, score) tuples that teach it to write a reasoning trace followed by a scalar score out of 5 using an additive rubric.
-
-At each iteration $t$, $M_t$: (1) generates $N=4$ candidate responses per prompt $x$; (2) re-prompts \emph{itself} with a judge template to score each candidate, producing a scalar $r_t(x, y) \in \{0,\ldots,5\}$ averaged over 3 independent samples to reduce variance; (3) forms preference pair $(y_w, y_l)$ from the highest- and lowest-scoring responses (ties discarded). The preference pairs are used to train $M_{t+1}$ via DPO ($\beta = 0.1$).
-
-The reward model is \emph{not frozen} --- it co-evolves with the policy, and the quality of the preference data improves across iterations. Pairwise reward accuracy rises from 65.1\% (SFT baseline) to 81.7\% (M3). On AlpacaEval 2.0, win rates improve from 9.94\% (M1) $\to$ 15.38\% (M2) $\to$ 20.44\% (M3), with M3 outperforming Claude 2, Gemini Pro, and GPT-4 0613 despite using only 3,200 seed examples.
+Crucially, the verifier provides no training-time gradient to the generator --- it is used only for Best-of-$k$ reranking at inference. This distinguishes V-STaR from later methods that feed verifier reasoning directly into the generator's training.
 
 % ============================================================
 \subsection{DPO with NLL}
@@ -250,111 +231,63 @@ The DPO term provides a contrastive signal (push apart $y_w$ and $y_l$), while t
                               & = -\log \sigma\!\left(\beta \log \frac{\pi_\theta(c_w, y_w \mid x)}{\pi_{\text{ref}}(c_w, y_w \mid x)} - \beta \log \frac{\pi_\theta(c_l, y_l \mid x)}{\pi_{\text{ref}}(c_l, y_l \mid x)}\right) - \alpha \frac{\log \pi_\theta(c_w, y_w \mid x)}{|c_w| + |y_w|}
     \label{eq:irpo}
 \end{align}
-The NLL term is length-normalised by $|c_w| + |y_w|$ to avoid a bias toward shorter sequences. Crucially, the reference model $\pi_{\text{ref}}$ is updated to $\pi_\theta$ at each iteration before re-sampling. Under standard DPO (i.e.\ $\alpha = 0$), the log-probabilities of \emph{chosen} sequences actually decrease during training --- the model achieves the required preference margin by pushing rejected probabilities down faster than chosen ones fall. The NLL anchor prevents this collapse: with $\alpha > 0$, chosen log-probabilities increase while rejected ones decrease, creating a healthy expanding margin. Empirically, DPO alone achieves 61.8\% on GSM8K while DPO+NLL achieves 73.1\% at iteration~1; after four iterations.
+The NLL term is length-normalised by $|c_w| + |y_w|$ to avoid a bias toward shorter sequences. Crucially, the reference model $\pi_{\text{ref}}$ is updated to $\pi_\theta$ at each iteration before re-sampling. Under standard DPO (i.e.\ $\alpha = 0$), the log-probabilities of \emph{chosen} sequences may actually decrease during training --- the model achieves the required preference margin by pushing rejected probabilities down faster than chosen ones fall. The NLL term prevents this collapse: with $\alpha > 0$, chosen log-probabilities increase while rejected ones decrease.
 
-\subsubsection{AIPO: Agreement-Aware Iterative Preference Optimization}
+\subsubsection{NLL on Chosen Responses: AIPO and RPO}
 \label{sec:aipo}
+\label{sec:rpo}
 
-\autocite{shen2024aipoimprovingtrainingobjective} set the NLL target to the \textbf{winning response}: $t = y_w$. Their key modification is to the DPO term itself. Defining the log-probability ratios
-$$
-    s_\theta = \log \frac{\pi_\theta(y_w \mid x)}{\pi_\theta(y_l \mid x)}, \qquad s_{\text{ref}} = \log \frac{\pi_{\text{ref}}(y_w \mid x)}{\pi_{\text{ref}}(y_l \mid x)},
-$$
-standard DPO is $-\log \sigma(\beta(s_\theta - s_{\text{ref}}))$. AIPO introduces an agreement-aware coefficient $\alpha > 0$:
-\begin{equation}
-    \mathcal{L}_{\alpha\text{-DPO}} = -\mathbb{E}_{\mathcal{D}}\!\left[\log \sigma\!\left(\beta\big(s_\theta - (1 + \alpha)\,s_{\text{ref}}\big)\right)\right]
-    \label{eq:alpha_dpo}
-\end{equation}
-The gradient weight decomposes as $\sigma(\beta(s_{\text{ref}} - s_\theta + \alpha\, s_{\text{ref}}))$: the additional $\alpha\,s_{\text{ref}}$ amplifies the learning signal when the reference model agrees with the preference label and dampens it when there is disagreement, mitigating the length exploitation that compounds across iterative DPO. The full AIPO loss combines this with a length-normalised NLL term:
+Both AIPO \autocite{shen2024aipoimprovingtrainingobjective} and RPO \autocite{liu2024provablymitigatingoveroptimizationrlhf} set the NLL target to the \textbf{winning response}: $t = y_w$. AIPO adds a length-normalised NLL anchor alongside $\alpha$-DPO, a DPO variant that scales the reference log-ratio by $(1+\alpha)$ to introduce a dynamic preference margin weighted by the reference model's agreement with the ranking:
 \begin{equation}
     \mathcal{L}_{\text{AIPO}} = \mathcal{L}_{\alpha\text{-DPO}} + \lambda \cdot \mathcal{L}_{\text{NLL}}, \qquad \mathcal{L}_{\text{NLL}} = -\frac{1}{|y_w|}\log \pi_\theta(y_w \mid x)
     \label{eq:aipo}
 \end{equation}
-AIPO achieves 57.1\% length-controlled win rate on AlpacaEval~2.0 with Gemma-2-9B-It and 81.6\% on Arena-Hard with Mistral-Large, outperforming GPT-4.
-
-\subsubsection{Regularized Preference Optimization (RPO)}
-\label{sec:rpo}
-
-\autocite{liu2024provablymitigatingoveroptimizationrlhf} set the NLL target to the \textbf{chosen responses}: $t = y_w$ --- the same target as AIPO --- but derive this choice from first principles rather than empirical motivation. They frame DPO overoptimization as a distributional shift problem and seek a policy that performs well against an adversarially chosen reward model: one that simultaneously minimises the BT preference loss and a penalty discouraging the policy from high-reward out-of-distribution responses:
-\begin{equation}
-    \hat\pi \in \arg\max_{\pi} \min_{r} \left\{ \mathbb{E}_{x,\, a \sim \pi}\!\left[r(x,a)\right] - \beta\, D_{\mathrm{KL}}\!\left(\pi \| \pi_{\text{ref}}\right) + \eta\,\mathcal{L}_{\mathcal{D}}(r) \right\}
-    \label{eq:rpo_minimax}
-\end{equation}
-Applying the DPO reparametrisation \eqref{eq:optimal_policy} and solving the inner maximisation in closed form, the minimax objective collapses exactly to DPO plus NLL on chosen responses:
+RPO derives the same NLL term from first principles: framing DPO overoptimisation as a minimax problem over adversarially chosen reward models, the objective collapses exactly to DPO plus NLL on chosen responses:
 \begin{equation}
     \mathcal{L}_{\text{RPO}}(\theta) = \mathcal{L}_{\text{DPO}}(\theta) \;-\; \eta\beta\,\mathbb{E}_{(x,y_w)\sim\mathcal{D}}\!\left[\log \pi_\theta(y_w \mid x)\right]
     \label{eq:rpo}
 \end{equation}
-The key theoretical contribution is that the NLL term is the exact residue of the adversarial penalty after reparametrisation, making DPO+NLL on chosen responses a provably sample-efficient solution under partial data coverage. Since DPO already computes $\log\pi_\theta(y_w|x)$ in its forward pass, RPO adds zero compute overhead. RPO outperforms DPO on MT-Bench (7.38 vs.\ 7.28 on Mistral-7B) and AlpacaEval 2.0 LC win rate (23.3\% vs.\ 21.2\%).
+Both methods improve over vanilla DPO, confirming that the NLL anchor mitigates reward hacking regardless of whether the motivation is empirical or theoretical.
 
 \subsubsection{Direct Judgement Preference Optimization (DJPO)}
 \label{sec:djpo}
 
-\autocite{wang2024directjudgementpreferenceoptimization} set the NLL target to the \textbf{verifier's CoT critique and judgment}: $t = (c_v, j)$, where $c_v$ is the verifier's chain-of-thought critique and $j$ is the final judgment. Crucially, the model being trained is a \textit{judge}, not the base policy. They construct three types of DPO preference pairs --- CoT critique $\mathcal{D}_{\text{CoT}}$, standard judgment $\mathcal{D}_{\text{Std}}$, and response deduction $\mathcal{D}_{\text{Ded}}$ --- and train the collective preference dataset with:
+\autocite{wang2024directjudgementpreferenceoptimization} set the NLL target to the \textbf{verifier's CoT critique and judgment}: $t = (c_v, j)$, where $c_v$ is the verifier's chain-of-thought critique and $j$ is the final judgment. Crucially, the model being trained is a judge, not the base policy. They construct DPO preference pairs over judge evaluations --- pairing correct and incorrect judgements (with and without CoT reasoning) --- and train with:
 \begin{equation}
-    \mathcal{L}_{\text{DJPO}} = -\frac{\log \pi_\theta(y_w^{} \mid x)}{|y_w| + |x|} - \log \sigma\!\left(\beta \log \frac{\pi_\theta(y_w \mid x)}{\pi_{\text{ref}}(y_w \mid x)} - \beta \log \frac{\pi_\theta(y_l \mid x)}{\pi_{\text{ref}}(y_l \mid x)}\right)
+    \mathcal{L}_{\text{DJPO}} = -\frac{\log \pi_\phi(c_{v,w} \mid x)}{|c_{v,w}| + |x|} - \log \sigma\!\left(\beta \log \frac{\pi_\phi(c_{v,w} \mid x)}{\pi_{\text{ref}}(c_{v,w} \mid x)} - \beta \log \frac{\pi_\phi(c_{v,l} \mid x)}{\pi_{\text{ref}}(c_{v,l} \mid x)}\right)
     \label{eq:djpo}
 \end{equation}
-where $y_w$ and $y_l$ are correct and incorrect judge evaluations respectively. Using 680K preference pairs with a 70:15:15 ratio across the three types, they train SFR-Judge models at 8B, 12B, and 70B scales. SFR-Judge-8B outperforms GPT-4o on aggregate pairwise evaluation across 7 benchmarks; SFR-Judge-70B achieves the best overall score of 84.25\%.
+where $c_{v,w}$ and $c_{v,l}$ are correct and incorrect judge evaluations (critique plus judgment) respectively. Using 680K preference pairs, they train SFR-Judge models at 8B, 12B, and 70B scales. SFR-Judge-8B outperforms GPT-4o on aggregate pairwise evaluation across 7 benchmarks; SFR-Judge-70B achieves the best overall score of 84.25\%.
 
 % ============================================================
 \subsection{Generative Verifiers and Critique-Augmented Reward Models}
 \label{sec:gen-verify}
 % ============================================================
 
-The methods above train the policy model. A parallel line of work improves the verifiers and reward models that judge responses, by having them produce reasoning before scoring. These methods establish that critique data is a powerful training signal for judging. Generative verifiers aim to provide a scalar verifier score that is used during inference for Best-of-N sampling, whereas critique-augmented reward models produce better reward models for downstream preference tuning etc.
+The methods above train the policy model. A parallel line of work improves the verifiers and reward models that judge responses, by having them produce reasoning before scoring. These methods establish that critique data is a powerful training signal for judging. Generative verifiers aim to provide a scalar verifier score that is used during inference for Best-of-N sampling, whereas critique-augmented reward models produce better reward models for downstream preference training.
 
 \subsubsection{Generative Verifiers (GenRM)}
 \label{sec:genrm}
 
-\autocite{zhang2024generativeverifiersrewardmodeling} observe that discriminative reward models require a separate classification head to assign scalar rewards and cannot use the LLM's generative capabilities --- they cannot reason step-by-step before scoring, and they cannot leverage additional inference-time compute. Generative verifiers (GenRM) address this by recasting verification as next-token prediction, training the verifier with the standard SFT loss. Gemini 1.0 Pro generates solutions for GSM8K while a Gemma model is fine-tuned as the verifier.
+\autocite{zhang2024generativeverifiersrewardmodeling} recast verification as next-token prediction rather than scalar classification. Instead of a separate reward head, the verifier is an LLM fine-tuned via SFT to answer ``Is the answer correct?'' given a problem $x$ and candidate solution $y$.
 
-In the simplest variant (\textbf{GenRM-Direct}), given instruction $I = \text{``Is the answer correct (Yes/No)?''}$, the verifier is trained on:
+In \textbf{GenRM-Direct}, the verifier is trained on pairs of $(x, y^+, I) \to \text{`Yes'}$ and $(x, y^-, I) \to \text{`No'}$, where $I$ = ``Is the answer correct (Yes/No)?''. At inference, the verifier score is the next-token probability of `Yes':
 \begin{equation}
-    \mathcal{D}_{\text{Direct}} = \{(x, y^+, I),\; \text{`Yes'}\} \;\cup\; \{(x, y^-, I),\; \text{`No'}\}
-    \label{eq:genrm_direct_data}
+    r_{\text{Direct}}(x, y) = \pi_\phi(\text{`Yes'} \mid x, y, I)
+    \label{eq:genrm_direct}
 \end{equation}
-where $y^+$ and $y^-$ are correct and incorrect solutions labelled by an external oracle. At inference, the verifier score is the next-token probability of `Yes':
-\begin{equation}
-    r_{\text{Direct}}(x, y) = \pi_\theta(\text{`Yes'} \mid x, y, I)
-    \label{eq:genrm_direct_score}
-\end{equation}
-which is used with Best-of-N sampling to choose the best generator solution at inference time.
 
-\textbf{Unifying generation and verification.} Training on correct solution generation provides positive transfer to verification. The default training objective for the verifier mixes both tasks:
+\textbf{GenRM-CoT} inserts a chain-of-thought verification rationale $c_v$ before the final Yes/No token. The rationales are generated offline by a capable LLM and filtered by majority agreement. At inference, the verifier first samples its own rationale, then scores:
 \begin{equation}
-    \mathcal{L}_{\text{GenRM}}(\theta) = \mathcal{L}_{\text{SFT}}(\theta, \mathcal{D}_{\text{verify}}) + \lambda\,\mathcal{L}_{\text{SFT}}(\theta, \mathcal{D}_{\text{correct}})
-    \label{eq:genrm}
-\end{equation}
-where $\mathcal{D}_{\text{verify}}$ is either $\mathcal{D}_{\text{Direct}}$ or $\mathcal{D}_{\text{CoT}}$, and $\mathcal{D}_{\text{correct}}$ is a set of correct solutions from the training set.
-
-\textbf{GenRM-CoT.} Since verification requires nuanced reasoning, GenRM-CoT inserts a chain-of-thought rationale $c_v$ before the final Yes/No token. The dataset is:
-\begin{equation*}
-    \mathcal{D}_{\text{CoT}} = \bigl\{(x, y^+, I_v),\,(c_v, I, \text{`Yes'})\bigr\} \cup \bigl\{(x, y^-, I_v),\,(c_v, I, \text{`No'})\bigr\}
-\end{equation*}
-where $I_v = \text{``Let's verify step by step''}$. The rationales $c_v$ are generated offline by a capable LLM. Rationales are filtered by majority agreement across multiple generated samples. The verifier itself generates no $c_v$ during training; only at inference does it sample its own rationale and then score:
-\begin{equation}
-    r_{\text{CoT}}(x, y) = \pi_\theta(\text{`Yes'} \mid x, y, I_v, c_v, I), \qquad c_v \sim \pi_\theta(\cdot \mid x, y, I_v)
+    r_{\text{CoT}}(x, y) = \pi_\phi(\text{`Yes'} \mid x, y, I_v, c_v, I), \qquad c_v \sim \pi_\phi(\cdot \mid x, y, I_v)
     \label{eq:genrm_cot}
 \end{equation}
-Multiple independent rationales can be sampled and aggregated via majority voting to use additional test-time compute:
-\begin{equation}
-    r_{\text{MV}@K}(x,y) = \frac{1}{K}\sum_{i=1}^{K} \pi_\theta\!\left(\text{`Yes'} \mid x, y, I_v, c_v^{(i)}, I\right), \quad c_v^{(i)} \overset{\text{i.i.d.}}{\sim} \pi_\theta(\cdot \mid x, y, I_v)
-    \label{eq:genrm_mv}
-\end{equation}
-
-The whole procedure is a single-pass offline SFT; the trained verifier is used only at inference for Best-of-$N$ reranking. GenRM-CoT achieves 94.2\% Best-of-32 on GSM8K (vs.\ $\sim$90\% for a discriminative RM), and generalises to MATH500 trained only on GSM8K with 6.4$\times$ better sample efficiency than the discriminative baseline. GenRM also outperforms DPO-trained verifiers substantially, with the best DPO scoring strategy (raw log-likelihood, without subtracting the reference) still underperforming GenRM-Direct.
+where $I_v$ = ``Let's verify step by step.'' GenRM-CoT achieves 94.2\% Best-of-32 on GSM8K (vs.\ ${\sim}$90\% for a discriminative RM) with 6.4$\times$ better sample efficiency. This dataset --- including the per-solution verification rationales --- is the data source for our experiments.
 
 \subsubsection{GenRM-STaR-DPO: Training Judges with DPO on Rationales}
 \label{sec:genrm-star}
 
-\autocite{mahan2024generativerewardmodels} (Mahan et al., 2024) propose a unified RLHF--RLAIF framework built on a key theoretical observation: under the Bradley-Terry model, the standard RLHF reward-difference objective is equivalent to a preference log-odds objective,
-\begin{equation}
-    r_\phi(x, y) - r_\phi(x, y_{\text{ref}}) = \log \frac{p_{\text{BT}}(y \succ y_{\text{ref}} \mid x)}{1 - p_{\text{BT}}(y \succ y_{\text{ref}} \mid x)}
-    \label{eq:genrm_logodds}
-\end{equation}
-This means one can replace the scalar reward parameterisation with a fully general preference model $p_\phi(y_w \succ y_l \mid x)$ extracted directly from an LLM's token probabilities, without requiring a separate classification head or a specific distributional assumption. This is the conceptual foundation for training a generative judge as a reward model.
-
-\textbf{Three training variants.} Given a preference dataset $\mathcal{D} = \{(x, y_1, y_2, I)\}$ where $I \in \{A, B\}$ is the winning response indicator:
+\autocite{mahan2024generativerewardmodels} (Mahan et al., 2024) propose a unified RLHF--RLAIF framework for training a generative judge as a reward model. They create 3 training variants. Given a preference dataset $\mathcal{D} = \{(x, y_1, y_2, I)\}$ where $I$ is the winning response indicator:
 
 \textbf{GenRM (no CoT)} --- standard SFT on the indicator token:
 \begin{equation}
@@ -362,7 +295,7 @@ This means one can replace the scalar reward parameterisation with a fully gener
     \label{eq:genrm_nochain}
 \end{equation}
 
-\textbf{CoT-GenRM with Rationalization} --- a post-rationalization model $q$ (e.g.\ GPT-4 or a stronger LLM) generates a critique rationale $c_v$ conditioned on the correct answer, and the model is trained on both:
+\textbf{CoT-GenRM with Rationalization} --- a post-rationalization model $q$ (e.g.\ GPT-4 or a stronger LLM) generates a critique rationale $c_v$ conditioned on the correct answer, and the model is trained to both generate the rationale and predict the indicator:
 \begin{equation}
     \mathcal{L}_{\text{Rationalizer}}(\pi_\phi) = \mathbb{E}_{(x,y_1,y_2,c_v,I)\sim\mathcal{D}}\!\left[-\log \pi_\phi(I \mid x, y_1, y_2, c_v) - \log \pi_\phi(c_v \mid x, y_1, y_2)\right]
     \label{eq:genrm_rat}
@@ -373,81 +306,29 @@ This means one can replace the scalar reward parameterisation with a fully gener
     \mathcal{L}_{\text{STaR-DPO}}(\pi_\phi) = -\mathbb{E}_{\mathcal{D}}\!\left[\log\sigma\!\left(\beta\log\frac{\pi_\phi(I_w, c_{v,w} \mid x, y_1, y_2)}{\pi_{\text{ref}}(I_w, c_{v,w} \mid x, y_1, y_2)} - \beta\log\frac{\pi_\phi(I_l, c_{v,l} \mid x, y_1, y_2)}{\pi_{\text{ref}}(I_l, c_{v,l} \mid x, y_1, y_2)}\right)\right]
     \label{eq:genrm_dpo}
 \end{equation}
-The model learns not just which response is correct but which \emph{reasoning patterns} lead to correct judgments, and this contrastive signal is what drives OOD generalisation.
-
-On-policy rationales are essential: using rationales from a strong off-policy model (GPT-4 or Llama-3.1-70B) as the training signal --- the STaR-Rationalizer approach --- matches STaR-DPO in-distribution but collapses OOD (RewardBench accuracy drops to 63--70\%, below even the zero-shot LLM-as-a-Judge). The authors attribute this to distribution mismatch: the model learns to imitate the rationalizer's style in-distribution but generates different reasoning at test time. STaR-DPO avoids this by training on the model's own self-generated rationales throughout. STaR-DPO matches the best explicit reward models in-distribution (73.9\% vs 73-74\%) while outperforming all of them OOD, particularly on Safety (91.0\% vs 81.8\% for PairRM). On reasoning-specific tasks (UltraInteract training, RewardBench Reasoning), STaR-DPO achieves 87.2\% vs 70.8\% for the best non-reasoning model.
+On-policy rationales are essential: using off-policy rationales from a stronger model (GPT-4 or Llama-3.1-70B) matches STaR-DPO in-distribution but collapses OOD (RewardBench drops to 63--70\%). The authors attribute this to distributional mismatch: the model imitates the rationaliser's style during training but generates different reasoning at test time.
 
 \subsubsection{Critique-out-Loud Reward Models (CLoud)}
 \label{sec:cloud}
 
-\autocite{ankner2024critiqueoutloudrewardmodels} train reward models that generate a natural-language critique $c$ before predicting a scalar reward. The model has 2 parameter groups built on top of a shared base $\theta_B$: $\theta_{LM}$: the pretrained LM head, which generates critique tokens autoregressively, and $\theta_R$: a randomly initialised shallow MLP reward head, which reads the final hidden state of the full sequence and outputs a scalar reward. Scoring at inference is therefore a two-step procedure: (1) \emph{generate} a critique by feeding $(x, y)$ through $\theta_B + \theta_{LM}$ to autoregressively sample $c$; then (2) \emph{score} by feeding the full sequence $(x, y, c)$ through $\theta_B + \theta_R$ to obtain the scalar $r_{\theta_R}(x, y, c)$. The training pipeline is as follows:
-
-\textbf{Stage 1 --- SFT on oracle critiques} External oracle critiques are generated offline by Llama-3.1-405B for every chosen and rejected response. $\theta_B ,\theta_{LM}$ is fine-tuned on these via NLL; ($\theta_R$ does not yet exist):
+\autocite{ankner2024critiqueoutloudrewardmodels} train reward models with a shared base $\theta_B$, an LM head $\theta_{LM}$ that generates critiques, and a scalar reward head $\theta_R$. Training proceeds in three stages: (1)~SFT $\theta_{LM}$ on oracle critiques; (2)~self-generate critiques to form $\mathcal{D}_{\text{self}}$; (3)~jointly optimise all parameters on $\mathcal{D}_{\text{self}}$:
 \begin{equation}
-    \mathcal{L}_{\text{SFT}}(\theta_B, \theta_{LM}) = -\mathbb{E}\!\left[\sum_t \log p(c_t^- \mid x, y^-, c_{<t}^-) + \sum_t \log p(c_t^+ \mid x, y^+, c_{<t}^+)\right]
-    \label{eq:cloud_sft}
-\end{equation}
-
-\textbf{Stage 2 --- Self-generated Critique} Using the Stage~1 model, new critiques are sampled for every training example: $\hat{c}^{\pm} \sim p(\cdot \mid x, y^{\pm};\,\tilde\theta_B, \tilde\theta_{LM})$. These replace the oracle critiques to form $\mathcal{D}_{\text{self}}$. At inference $\theta_R$ will see self-generated critiques, so we need to produce good self-generated critiques to reduce distributional shift.
-
-\textbf{Stage 3 --- Joint training on $\mathcal{D}_{\text{self}}$.} $\theta_R$ is randomly initialised on top of $\theta_B$ . All three parameter groups are jointly optimised on $\mathcal{D}_{\text{self}}$:
-\begin{equation}
-    \mathcal{L}_{\text{CLoud}} = \underbrace{-\mathbb{E}\!\left[\log\sigma\!\left(r_{\theta_R}(x, y^+, \hat{c}^+) - r_{\theta_R}(x, y^-, \hat{c}^-)\right)\right]}_{\mathcal{L}_{\text{RM}}\text{: trains }\theta_R\text{ and }\theta_B} \;+\; \lambda\,\underbrace{\mathcal{L}_{\text{SFT}}(\theta_B, \theta_{LM}, \mathcal{D}_{\text{self}})}_{\text{trains }\theta_{LM}\text{ and }\theta_B}
+    \mathcal{L}_{\text{CLoud}} = \underbrace{-\mathbb{E}\!\left[\log\sigma\!\left(r_{\theta_R}(x, y^+, \hat{c}^+) - r_{\theta_R}(x, y^-, \hat{c}^-)\right)\right]}_{\mathcal{L}_{\text{RM}}} \;+\; \lambda\,\underbrace{\mathcal{L}_{\text{SFT}}(\theta_B, \theta_{LM}, \mathcal{D}_{\text{self}})}_{\text{critique quality}}
     \label{eq:cloud}
 \end{equation}
-$\mathcal{L}_{\text{RM}}$ sends gradients into $\theta_R$ via the classic Bradley-Terry preference modelling loss; $\mathcal{L}_{\text{SFT}}$ sends gradients into $\theta_{LM}$. The $\mathcal{L}_{\text{SFT}}$ term in Stage~3 is important --- without it, $\theta_{LM}$ receives no gradient and critique quality degrades, which then corrupts the conditioning signal seen by $\theta_R$.
-
-At inference, $N$ critiques are sampled and the resulting scalar rewards averaged:
-\begin{equation}
-    \bar{R}(x, y) = \frac{1}{N}\sum_{i=1}^{N} r_{\theta_R}\!\left(x, y, c_i\right), \qquad c_i \sim p(\cdot \mid x, y;\,\theta_B, \theta_{LM})
-    \label{eq:cloud_sc}
-\end{equation}
-
-On-policy critiques are essential: training the reward head on oracle (off-policy) critiques causes a 5.6\% drop in RewardBench accuracy for the 8B model (3.0~pp for 70B) relative to self-generated (on-policy) training. The reward head learns to condition on the statistical properties of the critique distribution it saw during training; oracle critiques are systematically longer and more detailed than self-generated ones, so the reward head cannot properly calibrate from a distribution shift critique at inference. CLoud-8B improves pairwise RewardBench accuracy by 4.65\% over a classic RM and is Pareto-dominant across all $N \in [2,16]$ on ArenaHard Best-of-N win rate. The 8B CLoud model outperforms the 70B classic RM on Chat and Safety categories.
-
-\subsubsection{Critic-RM: Critiques as Latent Variables}
-\label{sec:critic-rm}
-
-\autocite{yu2025selfgeneratedcritiquesboostreward} provide a principled variational formulation that unifies critique generation and reward modeling, requiring no teacher LLM --- critiques are self-generated and quality-filtered.
-
-The model is built on a shared backbone $M_\theta$ with two heads: $q_\phi = h_g \circ M_\theta$ (the pretrained LM head, generates critique text) and $r_\psi = h_r \circ M_\theta$ (a randomly initialised scalar head, predicts reward). $q_\phi$ plays a dual role: it is simultaneously the \emph{approximate posterior} over the latent critiques $z$ (pushed toward the oracle $p^*$ by $\ell_c$) and the generator of critique samples that $r_\psi$ conditions on in $\ell_r$.
-
-Introducing critiques for chosen and rejected responses $z^+, z^-$ as latents and marginalising:
-$$p(y^+ \succ y^- \mid x) = \sum_{z^+, z^-} p(y^+ \succ y^- \mid z^+, z^-, x)\, p^*(z^+ \mid y^+, x)\, p^*(z^- \mid y^-, x)$$
-Since $p^*$ is intractable, substitute the learned $q_\phi$ and apply Jensen's inequality to obtain the ELBO:
-\begin{equation}
-    \log p(y^+ \succ y^- \mid x) \;\geq\; \mathbb{E}_{q_\phi(z^+|y^+,x),\,q_\phi(z^-|y^-,x)}\!\left[\log \frac{p(y^+ \succ y^-,\, z^+, z^- \mid x)}{q_\phi(z^+|y^+,x)\,q_\phi(z^-|y^-,x)}\right]
-    \label{eq:critic_rm}
-\end{equation}
-Maximising this ELBO decomposes into two objectives. The \textbf{critique generation loss} $\ell_c$ trains $q_\phi$ to approximate $p^*$. Reverse KL would cause entropy collapse, so \emph{forward} KL is used, treating the filtered critique set $Z$ as a uniform proxy for $p^*$:
-\begin{equation}
-    \ell_c = -\frac{1}{|Z|}\sum_{z \in Z} \log q_\phi(z \mid y, x)
-    \label{eq:critic_rm_c}
-\end{equation}
-The \textbf{preference modeling loss} $\ell_r$ trains $r_\psi$: the critique $z$ is appended to the response, and the scalar head pools from the concatenation $[y; z]$:
-\begin{equation}
-    \ell_r = -\log\sigma\!\left(r_\psi(x, [y^+; z^+]) - r_\psi(x, [y^-; z^-])\right)
-    \label{eq:critic_rm_r}
-\end{equation}
-
-\textbf{Dynamic weighting schedule.} The two losses are combined with a time-varying weight $\lambda(t)$:
-\begin{equation}
-    \mathcal{L}(\phi, \psi) = \lambda(t)\cdot\ell_c + \bigl(1-\lambda(t)\bigr)\cdot\ell_r, \qquad
-    \lambda(t) = \begin{cases} 1 & t < (K-1)T \\ 1 - \beta\cdot\dfrac{t-(K-1)T}{T} & t \geq (K-1)T \end{cases}
-    \label{eq:critic_rm_schedule}
-\end{equation}
-With $K=2$ epochs and $\beta=0.9$: the first epoch trains \emph{only} on critique generation ($\lambda=1$, reward head receives no gradient); in the final epoch $\lambda$ decays from $1$ to $0.1$, gradually shifting supervision to reward prediction. This ordering is essential --- the reward head only begins training once the LM already has strong critique capability, preventing reward-head overfitting before useful critiques can be generated. At inference, $m$ critiques are sampled and scalar rewards averaged: $\bar{r} = \frac{1}{m}\sum_{i=1}^m r_\psi(x, [y, z_i])$. Critic-RM at 10\% of training data (87.7) already outperforms the standard RM at 100\% data (86.4), demonstrating that jointly trained self-critiques are substantially more data-efficient than plain preference labels.
+The self-generation step is critical: training the reward head on oracle (off-policy) critiques causes a 5.6\% drop in RewardBench accuracy, because oracle critiques are systematically different from self-generated ones, creating a distributional shift at inference. \autocite{yu2025selfgeneratedcritiquesboostreward} extend this with a variational formulation (Critic-RM) that treats self-generated critiques as latent variables.
 
 % ============================================================
 \subsection{Training the Base Model with Critique}
 \label{sec:base-critique}
 % ============================================================
-The methods in Section~\ref{sec:gen-verify} improve reward models and judges by having them generate critique. A closely related cluster instead trains the base \emph{policy} model directly using critique signals. This section covers the methods most directly related to CDPO.
+The methods in Section~\ref{sec:gen-verify} improve reward models and judges by having them generate critique. A closely related cluster instead trains the base \emph{policy} model directly using critique signals.
+
 % ============================================================
 \subsubsection{Critique Fine-Tuning}
 % ============================================================
 
-\autocite{wang2025critiquefinetuninglearningcritique} ask: what happens if we use \emph{only} the NLL term on critique data, without any preference optimisation? In Critique Fine-Tuning (CFT), the base model is trained on the teacher's critique $c_v$ of a given query-response pair by maximising:
+\autocite{wang2025critiquefinetuninglearningcritique} ask: what happens if we use \emph{only} the NLL term on critique data, without any preference optimisation? In Critique Fine-Tuning (CFT), the base model is trained on the teacher's critique $c_v$ of a given query-response pair by maximising the log-likelihood:
 \begin{equation}
     \mathcal{L}_{\text{CFT}}(\theta) = -\sum_{t=1}^{|c_v|} \log \pi_\theta(c_{v,t} \mid c_{v,<t},\, [x;\, y])
     \label{eq:cft}
@@ -501,7 +382,7 @@ We use the GenRM dataset \autocite{zhang2024generativeverifiersrewardmodeling}, 
 From this raw data, we construct preference triples $(x, y_w, y_l, c_v)$ by pairing, for each problem, a correct solution $y_w$ with an incorrect solution $y_l$. The critique sequence $c_v$ is then assembled by concatenating \textit{both} solutions together with their respective verification rationales into a single contrastive narrative:
 \begin{quote}
     \small
-    $c_v$ = ``\texttt{This is a correct solution and preferred:}'' + $y_w$ + ``\texttt{Here's why this solution is correct and preferred:}'' + $c_{v,w}$ + ``\texttt{This is an incorrect solution and not preferred:}'' + $y_l$ ``\texttt{Here's why this solution is incorrect and not preferred:}'' + $c_{v,l}$
+    $c_v$ = ``\texttt{This is a correct solution and preferred:}'' + $y_w$ + ``\texttt{Here's why this solution is correct and preferred:}'' + $c_{v,w}$ + ``\texttt{This is an incorrect solution and not preferred:}'' + $y_l$ + ``\texttt{Here's why this solution is incorrect and not preferred:}'' + $c_{v,l}$
 \end{quote}
 From this data we derive four training methods, described below.
 
@@ -510,24 +391,24 @@ From this data we derive four training methods, described below.
 
 Each CDPO sample is $(x,\, y_w,\, y_l,\, c_v)$. CDPO augments the standard DPO loss with an auxiliary negative log-likelihood (NLL) term that trains the base policy to reproduce the verifier's chain-of-thought critique:
 \begin{equation}
-    \mathcal{L}_{\text{CDPO}}(\theta) = (1 - \alpha)\,\mathcal{L}_{\text{DPO}}(\theta) \;+\; \alpha\,\mathcal{L}_{\text{critique}}(\theta)
+    \mathcal{L}_{\text{CDPO}}(\theta) = \mathbb{E}_{\mathcal{D}}\!\left[(1 - \alpha)\,\mathcal{L}_{\text{DPO}}(\theta) \;+\; \alpha\,\mathcal{L}_{\text{critique}}(\theta)\right]
     \label{eq:cdpo_loss}
 \end{equation}
 where $\alpha \in [0, 1]$ controls the trade-off between the preference signal and the critique signal. The DPO term $\mathcal{L}_{\text{DPO}}$ is the standard loss from Eq.~\eqref{eq:dpo_loss}. The critique term is the length-normalised NLL over the composite critique $c_v$:
 \begin{equation}
-    \mathcal{L}_{\text{critique}}(\theta) = -\frac{1}{|c_v|}\sum_{t=1}^{|c_v|} \log \pi_\theta(c_{v,t} \mid c_{v,<t},\, x)
+    \mathcal{L}_{\text{critique}}(\theta) = -\frac{1}{|c_v|}\sum_{t=1}^{|c_v|} \log \pi_\theta(c_{v,t} \mid x,\, c_{v,<t})
     \label{eq:cdpo_nll}
 \end{equation}
 Concretely, the model receives the input sequence $[x;\, c_v]$ --- the problem followed by the critique --- and the NLL loss is computed only over the $c_v$ tokens, with $x$ serving as conditioning context. Because $c_v$ embeds both solutions $y_w$ and $y_l$ within its narrative (as shown above), it is self-contained: the model learns to generate the full contrastive analysis given only the problem statement. We hypothesise that reproducing this analysis teaches the model to distinguish correct from incorrect reasoning steps, thereby improving its own solution quality.
 
-CDPO thus instantiates the generic DPO+NLL template of Eq.~\eqref{eq:dpo_nll_template} with the NLL target set to the external verifier's critique $c_v$ (see Section~\ref{sec:positioning} for positioning against related methods). Note that at inference time, the CDPO-trained model generates solutions directly --- it does not produce critiques.
+CDPO follows the DPO+NLL pattern of Eq.~\eqref{eq:dpo_nll_template} with the NLL target set to the external verifier's critique $c_v$, but uses a convex combination rather than an additive weight so that $\alpha$ directly controls the relative contribution of each term (see Section~\ref{sec:positioning} for positioning against related methods). Note that at inference time, the CDPO-trained model generates solutions directly --- it does not produce critiques.
 
 \subsection{Baseline Methods}
 \label{sec:baselines}
 
 We compare CDPO against three baselines, all trained on the same underlying data:
 
-\textbf{DPO.} Each sample is $(x,\, y_w,\, y_l)$. The standard DPO loss (Eq.~\ref{eq:dpo_loss}), equivalent to setting $\alpha = 0$ in Eq.~\eqref{eq:cdpo_loss}. This isolates the contribution of the critique term.
+\textbf{DPO.} Each sample is $(x,\, y_w,\, y_l)$. The standard DPO loss Eq.~\eqref{eq:dpo_loss}, equivalent to setting $\alpha = 0$ in Eq.~\eqref{eq:cdpo_loss}. This isolates the contribution of the critique term.
 
 \textbf{SFT (no verification).} Each sample is $(x,\, y_w)$. Standard supervised fine-tuning on correct solutions only:
 \begin{equation}
@@ -545,31 +426,11 @@ We compare CDPO against three baselines, all trained on the same underlying data
 
 \subsection{Training Configuration}
 
-We use Qwen2.5-0.5B-Instruct \autocite{qwen2024qwen25} as the base model. All four methods share the same base configuration: LoRA with rank 8 applied to all linear modules, learning rate $1 \times 10^{-6}$ with cosine decay and 10\% warmup, 2 training epochs, bf16 mixed precision, FlashAttention-2, and DeepSpeed ZeRO Stage~3 across 8 NVIDIA H100 80GB GPUs. Method-specific settings are summarised in Table~\ref{tab:hparams}.
-
-\begin{table}[H]
-    \centering
-    \small
-    \caption{Method-specific hyperparameters. All other settings (LoRA rank, learning rate, scheduler, epochs, precision) are shared across methods.}
-    \label{tab:hparams}
-    \begin{tabular}{lcccc}
-        \hline
-                                   & \textbf{CDPO} & \textbf{DPO} & \textbf{SFT-veri} & \textbf{SFT-no\_veri} \\
-        \hline
-        Batch size / GPU           & 6             & 16           & 32                & 48                    \\
-        $\beta$                    & 0.1           & 0.1          & ---               & ---                   \\
-        $\alpha$ (critique weight) & 0.5           & ---          & ---               & ---                   \\
-        Length-normalised critique & Yes           & ---          & ---               & ---                   \\
-        Gradient checkpointing     & Yes           & No           & Yes               & Yes                   \\
-        \hline
-    \end{tabular}
-\end{table}
-
-The batch sizes differ across methods because CDPO processes three sequences per example (chosen, rejected, critique), requiring significantly more memory than the other methods.
+We use Qwen2.5-0.5B-Instruct \autocite{qwen2024qwen25} as the base model. All four methods share the same base configuration: LoRA with rank 8 applied to all linear modules, learning rate $1 \times 10^{-6}$ with cosine decay and 10\% warmup, 2 training epochs, bf16 mixed precision, FlashAttention-2, and DeepSpeed ZeRO Stage~3 across 8 NVIDIA H100 80GB GPUs. For DPO and CDPO we use $\beta = 0.1$; CDPO additionally uses $\alpha = 0.5$ with length-normalised critique. Batch sizes differ across methods because CDPO processes three sequences per example (chosen, rejected, critique), requiring significantly more memory. Full hyperparameters are listed in Table~\ref{tab:full_hparams} (Appendix~\ref{app:hparams}).
 
 \subsection{Evaluation}
 
-We evaluate on two mathematical reasoning benchmarks: GSM8K \autocite{cobbe2021training} (500 test samples) and MATH-500 \autocite{hendrycks2021measuring}. All evaluations use greedy decoding (temperature 0, top-$p$ = 1) via vLLM for efficient inference. LoRA adapters are merged with the base model before evaluation. We evaluate checkpoints saved at every 10\% of training (yielding 10--14 checkpoints per method). Note that our training data is drawn from GSM8K training problems, so GSM8K evaluation is in-distribution while MATH-500 is out-of-distribution; this partly explains the more stable GSM8K results for SFT methods.
+We evaluate on two mathematical reasoning benchmarks: GSM8K \autocite{cobbe2021training} (500 test samples) and MATH-500 \autocite{hendrycks2021measuring}. All evaluations use greedy decoding (temperature 0, top-$p$ = 1) via vLLM for efficient inference. LoRA adapters are merged with the base model before evaluation. We evaluate checkpoints saved at every 10\% of training. Note that our training data is drawn from GSM8K training problems, so GSM8K evaluation is in-distribution while MATH-500 is out-of-distribution; this partly explains the more stable GSM8K results for SFT methods.
 
 % ============================================================
 \section{Results}
