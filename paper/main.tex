@@ -1,5 +1,8 @@
 \documentclass[11pt]{article}
 %\usepackage{palatino,geometry,setspace,hyperref}
+\usepackage{setspace}
+\usepackage{titling}
+\setlength{\droptitle}{-2em}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
 \usepackage{palatino,geometry}
@@ -82,7 +85,6 @@
   {\end{mdframed}}
 
 \begin{document}
-
 \maketitle
 
 \begin{abstract}
@@ -351,22 +353,30 @@ where $s_{<k}$ are the correct preceding steps. The teacher's correction trace p
 
 The three defining features of CDPO are: \textbf{(A)} a DPO loss on answer preferences $(y_w, y_l)$; \textbf{(B)} an NLL term on the verifier's CoT critique $c_v$; and \textbf{(C)} applied to the base policy model. No single prior work combines all three.
 
-\begin{center}
-    \small
-    \begin{tabular}{lccc}
+\begin{table}[H]
+    \centering
+    \footnotesize
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabular}{@{}lccc@{}}
         \hline
-        \textbf{Paper}                                                                                             & \textbf{A: DPO on answers} & \textbf{B: NLL on verifier CoT} & \textbf{C: Base model} \\
+        \textbf{Paper}            & \textbf{DPO on answers} & \textbf{NLL on verifier CoT} & \textbf{Base model} \\
         \hline
-        \textbf{CDPO (this work)}                                                                                  & \checkmark                 & \checkmark                      & \checkmark             \\
-        IRPO \autocite{pang2024iterativereasoningpreferenceoptimization}                                           & \checkmark                 & NLL on own CoT                  & \checkmark             \\
-        AIPO / RPO \autocite{shen2024aipoimprovingtrainingobjective,liu2024provablymitigatingoveroptimizationrlhf} & \checkmark                 & NLL on $y_w$                    & \checkmark             \\
-        DJPO \autocite{wang2024directjudgementpreferenceoptimization}                                              & \checkmark                 & \checkmark                      & $\times$ (judge)       \\
-        GenRM-STaR-DPO \autocite{mahan2024generativerewardmodels}                                                  & \checkmark                 & \checkmark                      & $\times$ (judge)       \\
-        CFT \autocite{wang2025critiquefinetuninglearningcritique}                                                  & $\times$                   & \checkmark                      & \checkmark             \\
-        SuperCorrect \autocite{yang2024supercorrect}                                                               & On traces                  & Teacher correction              & \checkmark             \\
+        \textbf{CDPO (this work)} & \checkmark              & \checkmark                   & \checkmark          \\
+        IRPO \autocite{pang2024iterativereasoningpreferenceoptimization}
+                                  & \checkmark              & NLL on own CoT               & \checkmark          \\
+        AIPO \autocite{shen2024aipoimprovingtrainingobjective} / RPO \autocite{liu2024provablymitigatingoveroptimizationrlhf}
+                                  & \checkmark              & NLL on $y_w$                 & \checkmark          \\
+        DJPO \autocite{wang2024directjudgementpreferenceoptimization}
+                                  & \checkmark              & \checkmark                   & $\times$ (judge)    \\
+        GenRM-STaR-DPO \autocite{mahan2024generativerewardmodels}
+                                  & \checkmark              & \checkmark                   & $\times$ (judge)    \\
+        CFT \autocite{wang2025critiquefinetuninglearningcritique}
+                                  & $\times$                & \checkmark                   & \checkmark          \\
+        SuperCorrect \autocite{yang2024supercorrect}
+                                  & On traces               & Teacher correction           & \checkmark          \\
         \hline
     \end{tabular}
-\end{center}
+\end{table}
 
 CDPO sits at the intersection of three lines of work that have so far only been combined in pairs: (1) IRPO establishes the right loss structure (DPO + NLL) but anchors to the model's own CoT rather than an external verifier's critique; (2) DJPO and GenRM-STaR-DPO use verifier reasoning as the NLL target --- the right data --- but apply it to train a standalone judge rather than the answer-generating base policy; and (3) CFT applies verifier critique as a direct NLL target for the base policy --- the right model and signal --- but omits the DPO preference term entirely.
 
@@ -443,6 +453,7 @@ Table~\ref{tab:main_results} summarises the best and final checkpoint accuracy f
 
 \begin{table}[H]
     \centering
+    \renewcommand{\arraystretch}{1.2}
     \caption{Test accuracy (\%) on GSM8K and MATH-500. \textit{Best} reports the highest accuracy across all checkpoints; \textit{Final} reports the last checkpoint. The baseline is the unmodified Qwen2.5-0.5B-Instruct model.}
     \label{tab:main_results}
     \begin{tabular}{lcccc}
@@ -533,15 +544,13 @@ We proposed Critique DPO (CDPO), which extends the DPO objective with an auxilia
 \section{CDPO Training Algorithm}
 \label{app:algorithm}
 
-Algorithm~\ref{alg:cdpo} presents the pseudocode for CDPO training, corresponding to the implementation in \texttt{CustomCDPOTrainer}.
-
 \begin{algorithm}[H]
     \caption{CDPO Training (per batch)}
     \label{alg:cdpo}
     \begin{algorithmic}[1]
         \Require Policy $\pi_\theta$, reference $\pi_{\text{ref}}$, batch $\{(x_i, y_{w,i}, y_{l,i}, c_{v,i})\}_{i=1}^{B}$, weights $\alpha$, $\beta$
         \State \textbf{Concatenate} chosen, rejected, and critique into single batch of size $3B$
-        \State $\text{logits} \gets \pi_\theta(\text{batch})$ \Comment{Single forward pass, shape $3B \times T \times V$}
+        \State $\text{logits} \gets \pi_\theta(\text{batch})$
         \State $\text{all\_logps}, \text{lengths} \gets \textsc{GetBatchLogps}(\text{logits}, \text{labels})$ \Comment{Shape $3B$}
         \State \textbf{Delete} logits; free GPU memory
         \State $\log \pi_\theta(y_w), \log \pi_\theta(y_l), \log \pi_\theta(c_v) \gets \textsc{Split}(\text{all\_logps}, B)$
@@ -565,11 +574,10 @@ Algorithm~\ref{alg:cdpo} presents the pseudocode for CDPO training, correspondin
 \section{Hyperparameter Details}
 \label{app:hparams}
 
-Table~\ref{tab:full_hparams} lists all training hyperparameters.
-
 \begin{table}[H]
     \centering
     \small
+    \renewcommand{\arraystretch}{1.2}
     \caption{Complete training hyperparameters for all methods.}
     \label{tab:full_hparams}
     \begin{tabular}{lcccc}
@@ -593,10 +601,11 @@ Table~\ref{tab:full_hparams} lists all training hyperparameters.
         Preference loss            & sigmoid                                                    & sigmoid      & ---               & ---                   \\
         Gradient checkpointing     & Yes                                                        & No           & Yes               & Yes                   \\
         Dataset size               & 120K                                                       & 120K         & 120K              & 120K                  \\
-        Save frequency             & 10\%                                                       & 10\%         & 10\%              & 10\%                  \\
         \hline
     \end{tabular}
 \end{table}
+
+\newpage
 
 \printbibliography
 
