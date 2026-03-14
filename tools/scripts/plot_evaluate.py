@@ -6,11 +6,18 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 
 MODEL_RUNS = [
-    # "train-qwen2.5-0.5b-genrm-dpo-eval-gsm8k,math-500",
-    # "train-qwen2.5-0.5b-genrm-rdpo-eval-gsm8k,math-500",
+    "train-qwen2.5-0.5b-genrm-dpo-eval-gsm8k,math-500",
+    "train-qwen2.5-0.5b-genrm-rdpo-eval-gsm8k,math-500",
     "train-qwen2.5-0.5b-genrm-sft-veri-eval-gsm8k,math-500",
     "train-qwen2.5-0.5b-genrm-sft-no_veri-eval-gsm8k,math-500",
 ]
+
+DISPLAY_NAMES = {
+    "train-qwen2.5-0.5b-genrm-dpo-eval-gsm8k,math-500": "DPO",
+    "train-qwen2.5-0.5b-genrm-rdpo-eval-gsm8k,math-500": r"CDPO ($\alpha$=0.5)",
+    "train-qwen2.5-0.5b-genrm-sft-veri-eval-gsm8k,math-500": "SFT (with verification)",
+    "train-qwen2.5-0.5b-genrm-sft-no_veri-eval-gsm8k,math-500": "SFT (no verification)",
+}
 
 
 def plot_evaluate_results(validation_dir):
@@ -76,9 +83,12 @@ def plot_evaluate_results(validation_dir):
             results.sort()
             if results:
                 checkpoints, accuracies = zip(*results)
-                plt.plot(checkpoints, accuracies, marker="o", label=model_name)
+                # Normalize to training progress (save_steps=0.1, so each checkpoint is 10%)
+                max_ckpt = max(checkpoints)
+                progress = [c / max_ckpt * 100 for c in checkpoints]
+                plt.plot(progress, accuracies, marker="o", label=DISPLAY_NAMES.get(model_name, model_name))
 
-        plt.xlabel("Checkpoint")
+        plt.xlabel("Training Progress (%)")
         plt.ylabel("Accuracy (%)")
         plt.title(f"{dataset_name} Validation Accuracy by Checkpoint")
         plt.grid(True)
